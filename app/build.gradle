@@ -1,0 +1,38 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.escala.alarme'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.escala.alarme'
+        minSdk 26
+        targetSdk 35
+        // O número da versão sobe a cada compilação feita pelo GitHub (-PvCode=...).
+        versionCode Integer.parseInt((project.findProperty('vCode') ?: '1').toString())
+        versionName '1.' + (project.findProperty('vCode') ?: '1').toString()
+    }
+
+    // Chave fixa: assim as próximas versões instalam por cima sem perder as configurações.
+    signingConfigs {
+        debug {
+            storeFile file('alarme.keystore')
+            storePassword 'alarme123'
+            keyAlias 'alarme'
+            keyPassword 'alarme123'
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

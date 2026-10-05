@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#101820"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="32dp">
+
+    <TextView
+        android:id="@+id/hora"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="#FFFFFF"
+        android:textSize="84sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/info"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="64dp"
+        android:textColor="#CCFFFFFF"
+        android:textSize="22sp" />
+
+    <Button
+        android:id="@+id/btnDesligar"
+        android:layout_width="match_parent"
+        android:layout_height="88dp"
+        android:backgroundTint="#E53935"
+        android:text="Desligar"
+        android:textColor="#FFFFFF"
+        android:textSize="26sp" />
+
+    <Button
+        android:id="@+id/btnSoneca"
+        android:layout_width="match_parent"
+        android:layout_height="72dp"
+        android:layout_marginTop="20dp"
+        android:backgroundTint="#455A64"
+        android:textColor="#FFFFFF"
+        android:textSize="20sp" />
+</LinearLayout>

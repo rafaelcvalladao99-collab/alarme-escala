@@ -1,0 +1,61 @@
+name: Gerar APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Montar pastas do projeto
+        run: |
+          python3 - <<'EOF'
+          import os
+          texto = open('projeto.txt', encoding='utf-8').read()
+          for parte in texto.split('@@@FILE ')[1:]:
+              nome, _, corpo = parte.partition('\n')
+              os.makedirs(os.path.dirname(nome) or '.', exist_ok=True)
+              open(nome, 'w', encoding='utf-8').write(corpo)
+          EOF
+
+      - name: Criar chave de assinatura
+        run: |
+          keytool -genkeypair -keystore app/alarme.keystore \
+            -storepass alarme123 -keypass alarme123 -alias alarme \
+            -keyalg RSA -keysize 2048 -validity 20000 -dname "CN=Alarme Escala"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14.3'
+
+      - name: Compilar o app
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Renomear APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk AlarmeEscala.apk
+
+      - name: Guardar APK (aba Actions)
+        uses: actions/upload-artifact@v4
+        with:
+          name: AlarmeEscala
+          path: AlarmeEscala.apk
+
+      - name: Publicar APK (aba Releases)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Alarme da Escala v${{ github.run_number }}
+          files: AlarmeEscala.apk
+          make_latest: true

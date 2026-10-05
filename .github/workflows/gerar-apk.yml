@@ -14,34 +14,54 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Montar pastas do projeto
-        run: |
-          python3 - <<'EOF'
-          import os
-          texto = open('projeto.txt', encoding='utf-8').read()
-          for parte in texto.split('@@@FILE ')[1:]:
-              nome, _, corpo = parte.partition('\n')
-              os.makedirs(os.path.dirname(nome) or '.', exist_ok=True)
-              open(nome, 'w', encoding='utf-8').write(corpo)
-          EOF
-
-      - name: Criar chave de assinatura
-        run: |
-          keytool -genkeypair -keystore app/alarme.keystore \
-            -storepass alarme123 -keypass alarme123 -alias alarme \
-            -keyalg RSA -keysize 2048 -validity 20000 -dname "CN=Alarme Escala"
-
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
+
+      - name: Aplicar arquivos novos
+        run: |
+          python3 - <<'EOF'
+          import os, re
+          for pacote in ('projeto.txt', 'atualizacao.txt'):
+              if not os.path.exists(pacote):
+                  continue
+              texto = open(pacote, encoding='utf-8').read()
+              partes = re.split(r'^@@@(FILE|DELETE) (.+)$\n?', texto, flags=re.M)
+              for i in range(1, len(partes), 3):
+                  tipo, nome, corpo = partes[i], partes[i + 1].strip(), partes[i + 2]
+                  if tipo == 'FILE':
+                      os.makedirs(os.path.dirname(nome) or '.', exist_ok=True)
+                      open(nome, 'w', encoding='utf-8').write(corpo)
+                  elif os.path.exists(nome):
+                      os.remove(nome)
+              os.remove(pacote)
+          EOF
+
+      - name: Chave de assinatura fixa
+        run: |
+          if [ ! -f app/alarme.keystore ]; then
+            keytool -genkeypair -keystore app/alarme.keystore \
+              -storepass alarme123 -keypass alarme123 -alias alarme \
+              -keyalg RSA -keysize 2048 -validity 20000 -dname "CN=Alarme Escala"
+          fi
+
+      - name: Guardar arquivos no projeto
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -q -m "Aplica arquivos do projeto [skip ci]"
+            git push
+          fi
 
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.14.3'
 
       - name: Compilar o app
-        run: gradle assembleDebug --no-daemon --stacktrace
+        run: gradle assembleDebug -PvCode=${{ github.run_number }} --no-daemon --stacktrace
 
       - name: Renomear APK
         run: cp app/build/outputs/apk/debug/app-debug.apk AlarmeEscala.apk

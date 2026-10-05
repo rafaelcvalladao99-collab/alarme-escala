@@ -114,6 +114,10 @@ public class Atualizador {
                 PackageInstaller pi = app.getPackageManager().getPackageInstaller();
                 PackageInstaller.SessionParams sp = new PackageInstaller.SessionParams(
                         PackageInstaller.SessionParams.MODE_FULL_INSTALL);
+                sp.setAppPackageName(app.getPackageName());
+                if (android.os.Build.VERSION.SDK_INT >= 31) {
+                    sp.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED);
+                }
                 int id = pi.createSession(sp);
                 PackageInstaller.Session s = pi.openSession(id);
                 try {

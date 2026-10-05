@@ -21,8 +21,10 @@ import java.util.Locale;
 /** Notificação fixa que mostra quantos dias faltam para o próximo toque de cada alarme. */
 public class Contagem {
 
-    static final String CANAL = "proximos2";
+    static final String CANAL = "proximos3";
     static final int NOTIF_ID = 7;
+    static final int ID_BASE = 100;
+    static final String GRUPO = "alarmes";
     private static final Locale BR = Locale.forLanguageTag("pt-BR");
 
     private static class Item {
@@ -40,11 +42,22 @@ public class Contagem {
         return "em " + dias + " dias, " + data + " às " + hora;
     }
 
+    /** Cancela as nossas notificações que não valem mais, mantendo as n primeiras. */
+    private static void limpar(NotificationManager nm, int n) {
+        for (android.service.notification.StatusBarNotification sb : nm.getActiveNotifications()) {
+            int id = sb.getId();
+            boolean nosso = id == NOTIF_ID || (id >= ID_BASE && id < ID_BASE + 100);
+            if (!nosso) continue;
+            boolean vale = id == NOTIF_ID ? n > 1 : id - ID_BASE < n;
+            if (!vale) nm.cancel(id);
+        }
+    }
+
     public static void atualizar(Context c) {
         NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
         Escala e = new Escala(c);
         if (!e.mostrarContagem()) {
-            nm.cancel(NOTIF_ID);
+            limpar(nm, 0);
             return;
         }
 
@@ -60,12 +73,13 @@ public class Contagem {
             }
         }
         if (itens.isEmpty()) {
-            nm.cancel(NOTIF_ID);
+            limpar(nm, 0);
             return;
         }
         Collections.sort(itens, (x, y) -> x.quando.compareTo(y.quando));
 
         nm.deleteNotificationChannel("proximos");
+        nm.deleteNotificationChannel("proximos2");
         NotificationChannel ch = new NotificationChannel(CANAL, "Próximos alarmes",
                 NotificationManager.IMPORTANCE_DEFAULT);
         ch.setShowBadge(false);
@@ -74,31 +88,52 @@ public class Contagem {
         ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
         nm.createNotificationChannel(ch);
 
-        Notification.InboxStyle estilo = new Notification.InboxStyle();
-        for (Item it : itens) {
-            estilo.addLine(it.nome + ": " + quando(it.quando));
-        }
-        Item primeiro = itens.get(0);
-
         PendingIntent abrir = PendingIntent.getActivity(c, 20, new Intent(c, MainActivity.class),
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
 
-        Notification n = new Notification.Builder(c, CANAL)
-                .setSmallIcon(R.drawable.ic_alarme)
-                .setContentTitle(primeiro.nome + " — " + quando(primeiro.quando))
-                .setContentText(itens.size() > 1
-                        ? "Mais " + (itens.size() - 1) + " alarme" + (itens.size() > 2 ? "s" : "")
-                                + " — toque na seta para ver todos"
-                        : "Próximo alarme")
-                .setStyle(estilo)
-                .setOngoing(true)
-                .setCategory(Notification.CATEGORY_STATUS)
-                .setOnlyAlertOnce(true)
-                .setShowWhen(false)
-                .setVisibility(Notification.VISIBILITY_PUBLIC)
-                .setContentIntent(abrir)
-                .build();
-        nm.notify(NOTIF_ID, n);
+        limpar(nm, itens.size());
+
+        boolean varios = itens.size() > 1;
+        for (int i = 0; i < itens.size(); i++) {
+            Item it = itens.get(i);
+            Notification.Builder b = new Notification.Builder(c, CANAL)
+                    .setSmallIcon(R.drawable.ic_alarme)
+                    .setContentTitle(it.nome)
+                    .setContentText(quando(it.quando))
+                    .setOngoing(true)
+                    .setCategory(Notification.CATEGORY_STATUS)
+                    .setOnlyAlertOnce(true)
+                    .setShowWhen(false)
+                    .setVisibility(Notification.VISIBILITY_PUBLIC)
+                    .setContentIntent(abrir);
+            if (varios) {
+                b.setGroup(GRUPO)
+                        .setSortKey(String.format(Locale.US, "%03d", i))
+                        .setGroupAlertBehavior(Notification.GROUP_ALERT_SUMMARY);
+            }
+            nm.notify(ID_BASE + i, b.build());
+        }
+
+        if (varios) {
+            Notification.InboxStyle estilo = new Notification.InboxStyle();
+            for (Item it : itens) estilo.addLine(it.nome + ": " + quando(it.quando));
+            Item primeiro = itens.get(0);
+            Notification resumo = new Notification.Builder(c, CANAL)
+                    .setSmallIcon(R.drawable.ic_alarme)
+                    .setContentTitle(itens.size() + " alarmes")
+                    .setContentText("Próximo: " + primeiro.nome + " — " + quando(primeiro.quando))
+                    .setStyle(estilo)
+                    .setGroup(GRUPO)
+                    .setGroupSummary(true)
+                    .setGroupAlertBehavior(Notification.GROUP_ALERT_SUMMARY)
+                    .setOngoing(true)
+                    .setOnlyAlertOnce(true)
+                    .setShowWhen(false)
+                    .setVisibility(Notification.VISIBILITY_PUBLIC)
+                    .setContentIntent(abrir)
+                    .build();
+            nm.notify(NOTIF_ID, resumo);
+        }
     }
 
     /** Marca uma atualização logo depois da meia-noite, para a contagem de dias acompanhar o calendário. */

@@ -1,0 +1,1127 @@
+@@@FILE app/build.gradle
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.escala.alarme'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.escala.alarme'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName '1.0'
+    }
+
+    // Chave fixa: assim as próximas versões instalam por cima sem perder as configurações.
+    signingConfigs {
+        debug {
+            storeFile file('alarme.keystore')
+            storePassword 'alarme123'
+            keyAlias 'alarme'
+            keyPassword 'alarme123'
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+@@@FILE app/src/main/AndroidManifest.xml
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:theme="@style/Tema">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".TocandoActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:taskAffinity=""
+            android:theme="@style/Tema.Tocando" />
+
+        <receiver
+            android:name=".AlarmeReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
+
+        <service
+            android:name=".AlarmeService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+    </application>
+</manifest>
+@@@FILE app/src/main/java/com/escala/alarme/Agendador.java
+package com.escala.alarme;
+
+import android.app.AlarmManager;
+import android.app.PendingIntent;
+import android.content.Context;
+import android.content.Intent;
+import android.os.Build;
+
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+
+/** Marca o próximo alarme no sistema do Android. Só existe um alarme marcado por vez. */
+public class Agendador {
+
+    static final int REQ_ESCALA = 1;
+    static final int REQ_SONECA = 2;
+    static final int REQ_TESTE = 3;
+
+    /** Marca o próximo alarme da escala (a partir de agora). */
+    public static void agendar(Context c) {
+        agendarDepoisDe(c, LocalDateTime.now());
+    }
+
+    public static void agendarDepoisDe(Context c, LocalDateTime depoisDe) {
+        AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+        PendingIntent pi = piAlarme(c, REQ_ESCALA);
+        LocalDateTime prox = new Escala(c).proximo(depoisDe);
+        if (prox == null) {
+            am.cancel(pi);
+            return;
+        }
+        long ms = prox.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+        marcar(c, am, ms, pi);
+    }
+
+    /** Alarme avulso (soneca ou teste) daqui a alguns segundos. */
+    public static void agendarAvulso(Context c, int req, long daquiMs) {
+        AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+        marcar(c, am, System.currentTimeMillis() + daquiMs, piAlarme(c, req));
+    }
+
+    public static boolean podeAgendar(Context c) {
+        if (Build.VERSION.SDK_INT < 31) return true;
+        AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+        return am.canScheduleExactAlarms();
+    }
+
+    private static void marcar(Context c, AlarmManager am, long ms, PendingIntent pi) {
+        if (!podeAgendar(c)) return;
+        Intent abrir = new Intent(c, MainActivity.class);
+        PendingIntent mostrar = PendingIntent.getActivity(c, 0, abrir,
+                PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        try {
+            am.setAlarmClock(new AlarmManager.AlarmClockInfo(ms, mostrar), pi);
+        } catch (SecurityException e) {
+            // Sem permissão de alarme exato: o app mostra o aviso na tela principal.
+        }
+    }
+
+    static PendingIntent piAlarme(Context c, int req) {
+        Intent i = new Intent(c, AlarmeReceiver.class);
+        i.setAction(AlarmeReceiver.ACAO_TOCAR);
+        i.putExtra("req", req);
+        return PendingIntent.getBroadcast(c, req, i,
+                PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+    }
+}
+@@@FILE app/src/main/java/com/escala/alarme/AlarmeReceiver.java
+package com.escala.alarme;
+
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+
+import java.time.LocalDateTime;
+
+/** Recebe a hora do alarme e os botões "Desligar" / "Soneca" da notificação. */
+public class AlarmeReceiver extends BroadcastReceiver {
+
+    static final String ACAO_TOCAR = "com.escala.alarme.TOCAR";
+    static final String ACAO_PARAR = "com.escala.alarme.PARAR";
+    static final String ACAO_SONECA = "com.escala.alarme.SONECA";
+
+    @Override
+    public void onReceive(Context c, Intent intent) {
+        String acao = intent.getAction();
+        if (ACAO_PARAR.equals(acao)) {
+            parar(c);
+        } else if (ACAO_SONECA.equals(acao)) {
+            soneca(c);
+        } else if (ACAO_TOCAR.equals(acao)) {
+            int req = intent.getIntExtra("req", Agendador.REQ_ESCALA);
+            if (req == Agendador.REQ_ESCALA) {
+                // Já deixa marcado o próximo dia de trabalho.
+                Agendador.agendarDepoisDe(c, LocalDateTime.now().plusMinutes(1));
+            }
+            Intent s = new Intent(c, AlarmeService.class);
+            c.startForegroundService(s);
+        }
+    }
+
+    static void parar(Context c) {
+        c.stopService(new Intent(c, AlarmeService.class));
+    }
+
+    static void soneca(Context c) {
+        int min = new Escala(c).sonecaMinutos();
+        Agendador.agendarAvulso(c, Agendador.REQ_SONECA, min * 60_000L);
+        parar(c);
+    }
+}
+@@@FILE app/src/main/java/com/escala/alarme/AlarmeService.java
+package com.escala.alarme;
+
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.app.Service;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.ServiceInfo;
+import android.media.AudioAttributes;
+import android.media.AudioManager;
+import android.media.MediaPlayer;
+import android.media.RingtoneManager;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Handler;
+import android.os.IBinder;
+import android.os.Looper;
+import android.os.PowerManager;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
+import android.provider.Settings;
+
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+
+/** Toca o som e vibra até a pessoa desligar (ou até 10 minutos). */
+public class AlarmeService extends Service {
+
+    static final String CANAL = "alarme_tocando";
+    static final int NOTIF_ID = 42;
+    static final long LIMITE_MS = 10 * 60_000L;
+
+    private MediaPlayer player;
+    private Vibrator vibrador;
+    private PowerManager.WakeLock wakeLock;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private int volumeOriginal = -1;
+    private boolean tocando = false;
+
+    @Override
+    public IBinder onBind(Intent intent) { return null; }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        Notification n = criarNotificacao();
+        if (Build.VERSION.SDK_INT >= 29) {
+            startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
+        } else {
+            startForeground(NOTIF_ID, n);
+        }
+        if (!tocando) {
+            tocando = true;
+            PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "AlarmeEscala:tocando");
+            wakeLock.acquire(LIMITE_MS + 60_000L);
+            tocarSom();
+            vibrar();
+            handler.postDelayed(this::stopSelf, LIMITE_MS);
+            // Se o celular estiver desbloqueado e em uso, tenta abrir a tela do alarme também.
+            try {
+                startActivity(intentTela());
+            } catch (Exception ignored) { }
+        }
+        return START_NOT_STICKY;
+    }
+
+    private Intent intentTela() {
+        Intent i = new Intent(this, TocandoActivity.class);
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_USER_ACTION);
+        return i;
+    }
+
+    private Notification criarNotificacao() {
+        NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        NotificationChannel ch = new NotificationChannel(CANAL, "Alarme tocando",
+                NotificationManager.IMPORTANCE_HIGH);
+        ch.setSound(null, null); // o som é tocado pelo próprio app
+        ch.enableVibration(false);
+        ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+        ch.setBypassDnd(true);
+        nm.createNotificationChannel(ch);
+
+        PendingIntent tela = PendingIntent.getActivity(this, 10, intentTela(),
+                PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        PendingIntent parar = PendingIntent.getBroadcast(this, 11,
+                new Intent(this, AlarmeReceiver.class).setAction(AlarmeReceiver.ACAO_PARAR),
+                PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        PendingIntent soneca = PendingIntent.getBroadcast(this, 12,
+                new Intent(this, AlarmeReceiver.class).setAction(AlarmeReceiver.ACAO_SONECA),
+                PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+
+        String hora = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
+        int min = new Escala(this).sonecaMinutos();
+
+        return new Notification.Builder(this, CANAL)
+                .setSmallIcon(R.drawable.ic_alarme)
+                .setContentTitle("Alarme da escala — " + hora)
+                .setContentText("Hora de levantar!")
+                .setCategory(Notification.CATEGORY_ALARM)
+                .setVisibility(Notification.VISIBILITY_PUBLIC)
+                .setOngoing(true)
+                .setContentIntent(tela)
+                .setFullScreenIntent(tela, true)
+                .addAction(new Notification.Action.Builder(null, "Desligar", parar).build())
+                .addAction(new Notification.Action.Builder(null, "Soneca " + min + " min", soneca).build())
+                .build();
+    }
+
+    private void tocarSom() {
+        AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        try {
+            int max = am.getStreamMaxVolume(AudioManager.STREAM_ALARM);
+            int atual = am.getStreamVolume(AudioManager.STREAM_ALARM);
+            int minimo = (int) Math.ceil(max * 0.7);
+            if (atual < minimo) {
+                volumeOriginal = atual;
+                am.setStreamVolume(AudioManager.STREAM_ALARM, minimo, 0);
+            }
+        } catch (Exception ignored) { }
+
+        String escolhido = new Escala(this).toque();
+        Uri[] opcoes = {
+                escolhido != null ? Uri.parse(escolhido) : null,
+                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
+                Settings.System.DEFAULT_ALARM_ALERT_URI,
+                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE),
+                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
+        };
+        for (Uri u : opcoes) {
+            if (u == null) continue;
+            try {
+                MediaPlayer mp = new MediaPlayer();
+                mp.setAudioAttributes(new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build());
+                mp.setDataSource(this, u);
+                mp.setLooping(true);
+                mp.prepare();
+                mp.start();
+                player = mp;
+                return;
+            } catch (Exception e) {
+                // tenta o próximo som da lista
+            }
+        }
+    }
+
+    private void vibrar() {
+        vibrador = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+        if (vibrador == null || !vibrador.hasVibrator()) return;
+        AudioAttributes aa = new AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .build();
+        vibrador.vibrate(VibrationEffect.createWaveform(new long[]{0, 800, 600}, 0), aa);
+    }
+
+    @Override
+    public void onDestroy() {
+        handler.removeCallbacksAndMessages(null);
+        if (player != null) {
+            try { player.stop(); } catch (Exception ignored) { }
+            player.release();
+            player = null;
+        }
+        if (vibrador != null) vibrador.cancel();
+        if (volumeOriginal >= 0) {
+            try {
+                AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+                am.setStreamVolume(AudioManager.STREAM_ALARM, volumeOriginal, 0);
+            } catch (Exception ignored) { }
+        }
+        if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
+        TocandoActivity.fecharSeAberta();
+        super.onDestroy();
+    }
+}
+@@@FILE app/src/main/java/com/escala/alarme/BootReceiver.java
+package com.escala.alarme;
+
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+
+/** Remarca o alarme quando o celular liga, o app é atualizado ou a hora muda. */
+public class BootReceiver extends BroadcastReceiver {
+    @Override
+    public void onReceive(Context c, Intent intent) {
+        Agendador.agendar(c);
+    }
+}
+@@@FILE app/src/main/java/com/escala/alarme/Escala.java
+package com.escala.alarme;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Guarda as configurações e faz a conta da escala:
+ * ciclo de 10 dias, sendo os 4 primeiros de trabalho e os 6 seguintes de folga.
+ */
+public class Escala {
+
+    public static final int DIAS_CICLO = 10;
+    public static final int DIAS_TRABALHO = 4;
+
+    private final SharedPreferences p;
+
+    public Escala(Context c) {
+        p = c.getApplicationContext().getSharedPreferences("escala", Context.MODE_PRIVATE);
+    }
+
+    // ---------- configurações ----------
+
+    public boolean ativo() { return p.getBoolean("ativo", true); }
+    public void setAtivo(boolean v) { p.edit().putBoolean("ativo", v).apply(); }
+
+    /** Uma data que foi (ou será) o 1º dia de trabalho de algum ciclo. */
+    public LocalDate inicio() {
+        long e = p.getLong("inicio", Long.MIN_VALUE);
+        return e == Long.MIN_VALUE ? null : LocalDate.ofEpochDay(e);
+    }
+    public void setInicio(LocalDate d) { p.edit().putLong("inicio", d.toEpochDay()).apply(); }
+
+    /** dia: 0 a 3 (Dia 1 a Dia 4 de trabalho). */
+    public int hora(int dia) { return p.getInt("hora" + dia, 6); }
+    public int minuto(int dia) { return p.getInt("min" + dia, 0); }
+    public void setHorario(int dia, int h, int m) {
+        p.edit().putInt("hora" + dia, h).putInt("min" + dia, m).apply();
+    }
+
+    public boolean diaLigado(int dia) { return p.getBoolean("ligado" + dia, true); }
+    public void setDiaLigado(int dia, boolean v) { p.edit().putBoolean("ligado" + dia, v).apply(); }
+
+    /** Som escolhido (texto de um Uri) ou null para o som de alarme padrão do celular. */
+    public String toque() { return p.getString("toque", null); }
+    public void setToque(String uri) { p.edit().putString("toque", uri).apply(); }
+
+    public int sonecaMinutos() { return p.getInt("soneca", 10); }
+
+    // ---------- conta da escala ----------
+
+    /** Posição da data no ciclo: 0 a 9 (0-3 = trabalho, 4-9 = folga). -1 se não configurado. */
+    public int posicaoNoCiclo(LocalDate d) {
+        LocalDate ini = inicio();
+        if (ini == null) return -1;
+        long n = ChronoUnit.DAYS.between(ini, d);
+        return (int) Math.floorMod(n, (long) DIAS_CICLO);
+    }
+
+    public boolean ehTrabalho(LocalDate d) {
+        int pos = posicaoNoCiclo(d);
+        return pos >= 0 && pos < DIAS_TRABALHO;
+    }
+
+    /** Próximo horário de alarme estritamente depois de "depoisDe", ou null se não houver. */
+    public LocalDateTime proximo(LocalDateTime depoisDe) {
+        if (!ativo() || inicio() == null) return null;
+        LocalDate hoje = depoisDe.toLocalDate();
+        for (int i = 0; i <= DIAS_CICLO + 1; i++) {
+            LocalDate d = hoje.plusDays(i);
+            int pos = posicaoNoCiclo(d);
+            if (pos < DIAS_TRABALHO && diaLigado(pos)) {
+                LocalDateTime t = d.atTime(hora(pos), minuto(pos));
+                if (t.isAfter(depoisDe)) return t;
+            }
+        }
+        return null;
+    }
+
+    public List<LocalDateTime> proximos(int quantos) {
+        List<LocalDateTime> lista = new ArrayList<>();
+        LocalDateTime t = LocalDateTime.now();
+        for (int i = 0; i < quantos; i++) {
+            t = proximo(t);
+            if (t == null) break;
+            lista.add(t);
+        }
+        return lista;
+    }
+}
+@@@FILE app/src/main/java/com/escala/alarme/MainActivity.java
+package com.escala.alarme;
+
+import android.Manifest;
+import android.app.Activity;
+import android.app.DatePickerDialog;
+import android.app.NotificationManager;
+import android.app.TimePickerDialog;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
+import android.media.Ringtone;
+import android.media.RingtoneManager;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.PowerManager;
+import android.provider.Settings;
+import android.util.TypedValue;
+import android.view.Gravity;
+import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.LinearLayout;
+import android.widget.Switch;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Locale;
+
+public class MainActivity extends Activity {
+
+    private static final int PEDIR_NOTIF = 1;
+    private static final int ESCOLHER_SOM = 2;
+    private static final Locale BR = Locale.forLanguageTag("pt-BR");
+
+    private Escala escala;
+    private Switch swAtivo;
+    private TextView txtInicio, txtHoje, txtProximos;
+    private Button btnSom;
+    private LinearLayout avisos, dias;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        escala = new Escala(this);
+
+        swAtivo = findViewById(R.id.swAtivo);
+        txtInicio = findViewById(R.id.txtInicio);
+        txtHoje = findViewById(R.id.txtHoje);
+        txtProximos = findViewById(R.id.txtProximos);
+        btnSom = findViewById(R.id.btnSom);
+        avisos = findViewById(R.id.avisos);
+        dias = findViewById(R.id.dias);
+
+        swAtivo.setChecked(escala.ativo());
+        swAtivo.setOnCheckedChangeListener((b, v) -> {
+            escala.setAtivo(v);
+            atualizar();
+        });
+
+        findViewById(R.id.btnInicio).setOnClickListener(v -> escolherInicio());
+        btnSom.setOnClickListener(v -> escolherSom());
+        findViewById(R.id.btnTestar).setOnClickListener(v -> {
+            Agendador.agendarAvulso(this, Agendador.REQ_TESTE, 10_000L);
+            Toast.makeText(this, "Pode bloquear a tela. O alarme toca em 10 segundos.",
+                    Toast.LENGTH_LONG).show();
+        });
+
+        if (Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, PEDIR_NOTIF);
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        atualizar();
+    }
+
+    /** Redesenha a tela e remarca o próximo alarme. */
+    private void atualizar() {
+        Agendador.agendar(this);
+        montarAvisos();
+        montarDias();
+
+        LocalDate ini = escala.inicio();
+        if (ini == null) {
+            txtInicio.setText("Ainda não escolhido");
+            txtHoje.setText("Escolha a data de um 1º dia de trabalho para o alarme começar a funcionar.");
+        } else {
+            txtInicio.setText(ini.format(DateTimeFormatter.ofPattern("EEEE, dd/MM/yyyy", BR)));
+            int pos = escala.posicaoNoCiclo(LocalDate.now());
+            String hoje = pos < Escala.DIAS_TRABALHO
+                    ? "Hoje: dia " + (pos + 1) + " de trabalho"
+                    : "Hoje: folga (" + (pos - Escala.DIAS_TRABALHO + 1) + "º de 6 dias)";
+            txtHoje.setText(hoje);
+        }
+
+        btnSom.setText("Som: " + nomeDoSom());
+
+        List<LocalDateTime> prox = escala.proximos(8);
+        if (!escala.ativo()) {
+            txtProximos.setText("Alarme desligado.");
+        } else if (prox.isEmpty()) {
+            txtProximos.setText("Nenhum alarme marcado.");
+        } else {
+            DateTimeFormatter f = DateTimeFormatter.ofPattern("EEE, dd/MM 'às' HH:mm", BR);
+            StringBuilder sb = new StringBuilder();
+            for (LocalDateTime t : prox) {
+                int pos = escala.posicaoNoCiclo(t.toLocalDate());
+                if (sb.length() > 0) sb.append('\n');
+                sb.append("•  ").append(t.format(f)).append("   (dia ").append(pos + 1).append(")");
+            }
+            txtProximos.setText(sb.toString());
+        }
+    }
+
+    private void montarDias() {
+        dias.removeAllViews();
+        for (int i = 0; i < Escala.DIAS_TRABALHO; i++) {
+            final int dia = i;
+            LinearLayout linha = new LinearLayout(this);
+            linha.setOrientation(LinearLayout.HORIZONTAL);
+            linha.setGravity(Gravity.CENTER_VERTICAL);
+
+            CheckBox cb = new CheckBox(this);
+            cb.setText("Dia " + (i + 1));
+            cb.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+            cb.setChecked(escala.diaLigado(i));
+            cb.setOnCheckedChangeListener((b, v) -> {
+                escala.setDiaLigado(dia, v);
+                atualizar();
+            });
+            linha.addView(cb, new LinearLayout.LayoutParams(0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+            Button hora = new Button(this);
+            hora.setText(String.format(Locale.ROOT, "%02d:%02d", escala.hora(i), escala.minuto(i)));
+            hora.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
+            hora.setEnabled(escala.diaLigado(i));
+            hora.setOnClickListener(v -> new TimePickerDialog(this, (tp, h, m) -> {
+                escala.setHorario(dia, h, m);
+                atualizar();
+            }, escala.hora(dia), escala.minuto(dia), true).show());
+            linha.addView(hora);
+
+            dias.addView(linha);
+        }
+    }
+
+    private void escolherInicio() {
+        LocalDate d = escala.inicio() != null ? escala.inicio() : LocalDate.now();
+        new DatePickerDialog(this, (dp, ano, mes, dia) -> {
+            escala.setInicio(LocalDate.of(ano, mes + 1, dia));
+            atualizar();
+        }, d.getYear(), d.getMonthValue() - 1, d.getDayOfMonth()).show();
+    }
+
+    private void escolherSom() {
+        Intent i = new Intent(RingtoneManager.ACTION_RINGTONE_PICKER);
+        i.putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM);
+        i.putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Som do alarme");
+        i.putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false);
+        i.putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true);
+        String atual = escala.toque();
+        i.putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
+                atual != null ? Uri.parse(atual) : Settings.System.DEFAULT_ALARM_ALERT_URI);
+        try {
+            startActivityForResult(i, ESCOLHER_SOM);
+        } catch (Exception e) {
+            Toast.makeText(this, "Não foi possível abrir a lista de sons.", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == ESCOLHER_SOM && resultCode == RESULT_OK && data != null) {
+            Uri u = data.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI);
+            boolean padrao = u == null || u.equals(Settings.System.DEFAULT_ALARM_ALERT_URI);
+            escala.setToque(padrao ? null : u.toString());
+            atualizar();
+        }
+    }
+
+    private String nomeDoSom() {
+        String t = escala.toque();
+        if (t == null) return "padrão do celular";
+        try {
+            Ringtone r = RingtoneManager.getRingtone(this, Uri.parse(t));
+            if (r != null) return r.getTitle(this);
+        } catch (Exception ignored) { }
+        return "personalizado";
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        atualizar();
+    }
+
+    // ---------- avisos de permissão ----------
+
+    private void montarAvisos() {
+        avisos.removeAllViews();
+        String pkg = "package:" + getPackageName();
+
+        if (Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            aviso("Sem permissão de notificação, o alarme pode não aparecer na tela.",
+                    "Permitir notificações", () -> {
+                        if (shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) {
+                            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, PEDIR_NOTIF);
+                        } else {
+                            abrir(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                    .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName()));
+                        }
+                    });
+        }
+
+        if (!Agendador.podeAgendar(this) && Build.VERSION.SDK_INT >= 31) {
+            aviso("O app precisa de permissão para \"Alarmes e lembretes\". Sem ela o alarme NÃO toca.",
+                    "Dar permissão", () -> abrir(new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                            Uri.parse(pkg))));
+        }
+
+        if (Build.VERSION.SDK_INT >= 34) {
+            NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            if (!nm.canUseFullScreenIntent()) {
+                aviso("Permita \"notificações em tela cheia\" para o alarme aparecer com o celular bloqueado.",
+                        "Permitir tela cheia", () -> abrir(new Intent(
+                                Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse(pkg))));
+            }
+        }
+
+        PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        if (!pm.isIgnoringBatteryOptimizations(getPackageName())) {
+            aviso("Recomendado: tirar o app da economia de bateria, para o celular não bloquear o alarme.",
+                    "Liberar bateria", () -> abrir(new Intent(
+                            Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse(pkg))));
+        }
+    }
+
+    private void aviso(String texto, String botao, Runnable acao) {
+        LinearLayout caixa = new LinearLayout(this);
+        caixa.setOrientation(LinearLayout.VERTICAL);
+        int p = dp(12);
+        caixa.setPadding(p, p, p, p);
+        GradientDrawable fundo = new GradientDrawable();
+        fundo.setColor(Color.parseColor("#33FF9800"));
+        fundo.setCornerRadius(dp(12));
+        caixa.setBackground(fundo);
+
+        TextView t = new TextView(this);
+        t.setText(texto);
+        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        caixa.addView(t);
+
+        Button b = new Button(this);
+        b.setText(botao);
+        b.setOnClickListener(v -> acao.run());
+        caixa.addView(b);
+
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.bottomMargin = dp(10);
+        avisos.addView(caixa, lp);
+    }
+
+    private void abrir(Intent i) {
+        try {
+            startActivity(i);
+        } catch (Exception e) {
+            try {
+                startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:" + getPackageName())));
+            } catch (Exception ignored) { }
+        }
+    }
+
+    private int dp(int v) {
+        return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v,
+                getResources().getDisplayMetrics());
+    }
+}
+@@@FILE app/src/main/java/com/escala/alarme/TocandoActivity.java
+package com.escala.alarme;
+
+import android.app.Activity;
+import android.os.Build;
+import android.os.Bundle;
+import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.TextView;
+
+import java.lang.ref.WeakReference;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+
+/** Tela cheia que aparece quando o alarme toca, inclusive com o celular bloqueado. */
+public class TocandoActivity extends Activity {
+
+    private static WeakReference<TocandoActivity> aberta = new WeakReference<>(null);
+
+    static void fecharSeAberta() {
+        TocandoActivity a = aberta.get();
+        if (a != null && !a.isFinishing()) a.finish();
+    }
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        aberta = new WeakReference<>(this);
+
+        if (Build.VERSION.SDK_INT >= 27) {
+            setShowWhenLocked(true);
+            setTurnScreenOn(true);
+        } else {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                    | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
+        }
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
+        setContentView(R.layout.activity_tocando);
+
+        TextView hora = findViewById(R.id.hora);
+        TextView info = findViewById(R.id.info);
+        Button desligar = findViewById(R.id.btnDesligar);
+        Button soneca = findViewById(R.id.btnSoneca);
+
+        hora.setText(LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm")));
+        Escala e = new Escala(this);
+        int pos = e.posicaoNoCiclo(LocalDate.now());
+        if (pos >= 0 && pos < Escala.DIAS_TRABALHO) {
+            info.setText("Dia " + (pos + 1) + " de trabalho");
+        } else {
+            info.setText("Alarme");
+        }
+        soneca.setText("Soneca (" + e.sonecaMinutos() + " min)");
+
+        desligar.setOnClickListener(v -> {
+            AlarmeReceiver.parar(this);
+            finish();
+        });
+        soneca.setOnClickListener(v -> {
+            AlarmeReceiver.soneca(this);
+            finish();
+        });
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (aberta.get() == this) aberta = new WeakReference<>(null);
+        super.onDestroy();
+    }
+}
+@@@FILE app/src/main/res/drawable/ic_alarme.xml
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M22,5.72l-4.6,-3.86 -1.29,1.53 4.6,3.86L22,5.72zM7.88,3.39L6.6,1.86 2,5.71l1.29,1.53 4.59,-3.85zM12.5,8L11,8v6l4.75,2.85 0.75,-1.23 -4,-2.37L12.5,8zM12,4c-4.97,0 -9,4.03 -9,9s4.02,9 9,9c4.97,0 9,-4.03 9,-9s-4.03,-9 -9,-9zM12,20c-3.87,0 -7,-3.13 -7,-7s3.13,-7 7,-7 7,3.13 7,7 -3.13,7 -7,7z" />
+</vector>
+@@@FILE app/src/main/res/drawable/ic_launcher_frente.xml
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:translateX="30"
+        android:translateY="30">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M44,11.44l-9.2,-7.72 -2.58,3.06 9.2,7.72L44,11.44zM15.76,6.78L13.2,3.72 4,11.42l2.58,3.06 9.18,-7.7zM25,16L22,16v12l9.5,5.7 1.5,-2.46 -8,-4.74L25,16zM24,8c-9.94,0 -18,8.06 -18,18s8.04,18 18,18c9.94,0 18,-8.06 18,-18s-8.06,-18 -18,-18zM24,40c-7.74,0 -14,-6.26 -14,-14s6.26,-14 14,-14 14,6.26 14,14 -6.26,14 -14,14z" />
+    </group>
+</vector>
+@@@FILE app/src/main/res/layout/activity_main.xml
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/app_name"
+            android:textSize="28sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:alpha="0.7"
+            android:text="4 dias de trabalho, 6 de folga — repete a cada 10 dias"
+            android:textSize="15sp" />
+
+        <LinearLayout
+            android:id="@+id/avisos"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+        <Switch
+            android:id="@+id/swAtivo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingVertical="8dp"
+            android:text="Alarme ligado"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <TextView
+            style="@style/Titulo"
+            android:text="1º dia de trabalho de um ciclo" />
+
+        <TextView
+            android:id="@+id/txtInicio"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="18sp" />
+
+        <Button
+            android:id="@+id/btnInicio"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Escolher data" />
+
+        <TextView
+            android:id="@+id/txtHoje"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textSize="16sp"
+            android:textStyle="italic" />
+
+        <TextView
+            style="@style/Titulo"
+            android:text="Horário de cada dia de trabalho" />
+
+        <LinearLayout
+            android:id="@+id/dias"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+        <TextView
+            style="@style/Titulo"
+            android:text="Som" />
+
+        <Button
+            android:id="@+id/btnSom"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="start|center_vertical" />
+
+        <TextView
+            style="@style/Titulo"
+            android:text="Próximos alarmes" />
+
+        <TextView
+            android:id="@+id/txtProximos"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:lineSpacingExtra="6dp"
+            android:textSize="16sp" />
+
+        <Button
+            android:id="@+id/btnTestar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="Testar alarme (toca em 10 segundos)" />
+    </LinearLayout>
+</ScrollView>
+@@@FILE app/src/main/res/layout/activity_tocando.xml
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#101820"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="32dp">
+
+    <TextView
+        android:id="@+id/hora"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="#FFFFFF"
+        android:textSize="84sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/info"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="64dp"
+        android:textColor="#CCFFFFFF"
+        android:textSize="22sp" />
+
+    <Button
+        android:id="@+id/btnDesligar"
+        android:layout_width="match_parent"
+        android:layout_height="88dp"
+        android:backgroundTint="#E53935"
+        android:text="Desligar"
+        android:textColor="#FFFFFF"
+        android:textSize="26sp" />
+
+    <Button
+        android:id="@+id/btnSoneca"
+        android:layout_width="match_parent"
+        android:layout_height="72dp"
+        android:layout_marginTop="20dp"
+        android:backgroundTint="#455A64"
+        android:textColor="#FFFFFF"
+        android:textSize="20sp" />
+</LinearLayout>
+@@@FILE app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/fundo_icone" />
+    <foreground android:drawable="@drawable/ic_launcher_frente" />
+</adaptive-icon>
+@@@FILE app/src/main/res/values-night/themes.xml
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Tema" parent="android:Theme.Material.NoActionBar">
+        <item name="android:colorPrimary">#64B5F6</item>
+        <item name="android:colorAccent">#64B5F6</item>
+        <item name="android:statusBarColor">#121212</item>
+    </style>
+
+    <style name="Titulo">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">24dp</item>
+        <item name="android:layout_marginBottom">6dp</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:textColor">#64B5F6</item>
+    </style>
+</resources>
+@@@FILE app/src/main/res/values/colors.xml
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="fundo_icone">#1E6FB8</color>
+</resources>
+@@@FILE app/src/main/res/values/strings.xml
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Alarme da Escala</string>
+</resources>
+@@@FILE app/src/main/res/values/themes.xml
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Tema" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:colorPrimary">#1E6FB8</item>
+        <item name="android:colorAccent">#1E6FB8</item>
+        <item name="android:statusBarColor">#1E6FB8</item>
+    </style>
+
+    <style name="Tema.Tocando" parent="android:Theme.Material.NoActionBar.Fullscreen">
+        <item name="android:windowBackground">#101820</item>
+    </style>
+
+    <style name="Titulo">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">24dp</item>
+        <item name="android:layout_marginBottom">6dp</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:textColor">#1E6FB8</item>
+    </style>
+</resources>
+@@@FILE build.gradle
+plugins {
+    id 'com.android.application' version '8.7.3' apply false
+}
+@@@FILE gradle.properties
+org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+android.nonTransitiveRClass=true
+@@@FILE settings.gradle
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.name = "AlarmeEscala"
+include ':app'

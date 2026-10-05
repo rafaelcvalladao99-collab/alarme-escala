@@ -10,12 +10,26 @@
         android:orientation="vertical"
         android:padding="20dp">
 
-        <TextView
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/app_name"
-            android:textSize="28sp"
-            android:textStyle="bold" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/app_name"
+                android:textSize="28sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/btnConfig"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Configurações" />
+        </LinearLayout>
 
         <TextView
             android:layout_width="wrap_content"
@@ -47,34 +61,5 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:text="+ Novo alarme" />
-
-        <TextView
-            style="@style/Titulo"
-            android:text="Som" />
-
-        <Button
-            android:id="@+id/btnSom"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="start|center_vertical" />
-
-        <TextView
-            style="@style/Titulo"
-            android:text="Notificação" />
-
-        <Switch
-            android:id="@+id/swContagem"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingVertical="8dp"
-            android:text="Mostrar quantos dias faltam para cada alarme"
-            android:textSize="16sp" />
-
-        <Button
-            android:id="@+id/btnTestar"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="Testar alarme (toca em 10 segundos)" />
     </LinearLayout>
 </ScrollView>

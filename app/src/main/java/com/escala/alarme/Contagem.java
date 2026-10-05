@@ -21,7 +21,7 @@ import java.util.Locale;
 /** Notificação fixa que mostra quantos dias faltam para o próximo toque de cada alarme. */
 public class Contagem {
 
-    static final String CANAL = "proximos";
+    static final String CANAL = "proximos2";
     static final int NOTIF_ID = 7;
     private static final Locale BR = Locale.forLanguageTag("pt-BR");
 
@@ -65,15 +65,18 @@ public class Contagem {
         }
         Collections.sort(itens, (x, y) -> x.quando.compareTo(y.quando));
 
+        nm.deleteNotificationChannel("proximos");
         NotificationChannel ch = new NotificationChannel(CANAL, "Próximos alarmes",
-                NotificationManager.IMPORTANCE_LOW);
+                NotificationManager.IMPORTANCE_DEFAULT);
         ch.setShowBadge(false);
+        ch.setSound(null, null);
+        ch.enableVibration(false);
+        ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
         nm.createNotificationChannel(ch);
 
-        StringBuilder linhas = new StringBuilder();
+        Notification.InboxStyle estilo = new Notification.InboxStyle();
         for (Item it : itens) {
-            if (linhas.length() > 0) linhas.append('\n');
-            linhas.append(it.nome).append(": ").append(quando(it.quando));
+            estilo.addLine(it.nome + ": " + quando(it.quando));
         }
         Item primeiro = itens.get(0);
 
@@ -84,10 +87,12 @@ public class Contagem {
                 .setSmallIcon(R.drawable.ic_alarme)
                 .setContentTitle(primeiro.nome + " — " + quando(primeiro.quando))
                 .setContentText(itens.size() > 1
-                        ? "Arraste para baixo para ver os " + itens.size() + " próximos alarmes"
+                        ? "Mais " + (itens.size() - 1) + " alarme" + (itens.size() > 2 ? "s" : "")
+                                + " — toque na seta para ver todos"
                         : "Próximo alarme")
-                .setStyle(new Notification.BigTextStyle().bigText(linhas.toString()))
+                .setStyle(estilo)
                 .setOngoing(true)
+                .setCategory(Notification.CATEGORY_STATUS)
                 .setOnlyAlertOnce(true)
                 .setShowWhen(false)
                 .setVisibility(Notification.VISIBILITY_PUBLIC)

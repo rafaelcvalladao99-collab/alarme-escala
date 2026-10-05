@@ -35,6 +35,10 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
+            android:name=".ConfigActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".TocandoActivity"
             android:exported="false"
             android:excludeFromRecents="true"

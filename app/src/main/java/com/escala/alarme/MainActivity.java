@@ -34,11 +34,9 @@ import java.util.Locale;
 public class MainActivity extends Activity {
 
     private static final int PEDIR_NOTIF = 1;
-    private static final int ESCOLHER_SOM = 2;
     private static final Locale BR = Locale.forLanguageTag("pt-BR");
 
     private Escala escala;
-    private Button btnSom;
     private LinearLayout avisos, lista;
     private TextView txtVersao;
     private Atualizador.Info novaVersao;
@@ -50,25 +48,13 @@ public class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
         escala = new Escala(this);
 
-        btnSom = findViewById(R.id.btnSom);
         avisos = findViewById(R.id.avisos);
         lista = findViewById(R.id.lista);
 
-        Switch swContagem = findViewById(R.id.swContagem);
-        swContagem.setChecked(escala.mostrarContagem());
-        swContagem.setOnCheckedChangeListener((b, v) -> {
-            escala.setMostrarContagem(v);
-            Contagem.atualizar(this);
-        });
-
         findViewById(R.id.btnNovo).setOnClickListener(v ->
                 startActivity(new Intent(this, EditarActivity.class)));
-        btnSom.setOnClickListener(v -> escolherSom());
-        findViewById(R.id.btnTestar).setOnClickListener(v -> {
-            Agendador.agendarAvulso(this, Agendador.REQ_TESTE, 10_000L, "Teste");
-            Toast.makeText(this, "Pode bloquear a tela. O alarme toca em 10 segundos.",
-                    Toast.LENGTH_LONG).show();
-        });
+        findViewById(R.id.btnConfig).setOnClickListener(v ->
+                startActivity(new Intent(this, ConfigActivity.class)));
 
         if (Build.VERSION.SDK_INT >= 33
                 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -76,7 +62,7 @@ public class MainActivity extends Activity {
         }
 
         // Rodapé: versão instalada e botão de atualização.
-        LinearLayout raiz = (LinearLayout) findViewById(R.id.btnTestar).getParent();
+        LinearLayout raiz = (LinearLayout) findViewById(R.id.btnNovo).getParent();
         txtVersao = new TextView(this);
         txtVersao.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         txtVersao.setAlpha(0.7f);
@@ -135,7 +121,6 @@ public class MainActivity extends Activity {
         Agendador.agendar(this);
         montarAvisos();
         montarLista();
-        btnSom.setText("Som: " + nomeDoSom());
     }
 
     private void montarLista() {
@@ -207,43 +192,6 @@ public class MainActivity extends Activity {
         lp.bottomMargin = dp(10);
         linha.setLayoutParams(lp);
         return linha;
-    }
-
-    private void escolherSom() {
-        Intent i = new Intent(RingtoneManager.ACTION_RINGTONE_PICKER);
-        i.putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM);
-        i.putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Som do alarme");
-        i.putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false);
-        i.putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true);
-        String atual = escala.toque();
-        i.putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
-                atual != null ? Uri.parse(atual) : Settings.System.DEFAULT_ALARM_ALERT_URI);
-        try {
-            startActivityForResult(i, ESCOLHER_SOM);
-        } catch (Exception e) {
-            Toast.makeText(this, "Não foi possível abrir a lista de sons.", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == ESCOLHER_SOM && resultCode == RESULT_OK && data != null) {
-            Uri u = data.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI);
-            boolean padrao = u == null || u.equals(Settings.System.DEFAULT_ALARM_ALERT_URI);
-            escala.setToque(padrao ? null : u.toString());
-            atualizar();
-        }
-    }
-
-    private String nomeDoSom() {
-        String t = escala.toque();
-        if (t == null) return "padrão do celular";
-        try {
-            Ringtone r = RingtoneManager.getRingtone(this, Uri.parse(t));
-            if (r != null) return r.getTitle(this);
-        } catch (Exception ignored) { }
-        return "personalizado";
     }
 
     @Override

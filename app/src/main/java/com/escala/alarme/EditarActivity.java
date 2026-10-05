@@ -78,6 +78,7 @@ public class EditarActivity extends Activity {
         raiz.addView(titulo("Nome"));
         edNome = new EditText(this);
         edNome.setSingleLine(true);
+        edNome.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         edNome.setHint("Ex.: Trabalho, Aluguel");
         raiz.addView(edNome, larguraTotal());
 
@@ -177,7 +178,7 @@ public class EditarActivity extends Activity {
     }
 
     private void preencher() {
-        edNome.setText(a.nome);
+        edNome.setText(novo ? "" : a.nome);
         edCiclo.setText(String.valueOf(a.ciclo));
 
         hs = new int[a.trabalho];

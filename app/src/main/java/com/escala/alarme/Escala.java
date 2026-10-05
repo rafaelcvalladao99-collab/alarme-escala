@@ -3,20 +3,22 @@ package com.escala.alarme;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import org.json.JSONArray;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Guarda as configurações e faz a conta da escala:
- * ciclo de 10 dias, sendo os 4 primeiros de trabalho e os 6 seguintes de folga.
- */
+/** Guarda a lista de alarmes e as configurações gerais do app. */
 public class Escala {
 
-    public static final int DIAS_CICLO = 10;
-    public static final int DIAS_TRABALHO = 4;
+    public static class Proximo {
+        public Alarme alarme;
+        public LocalDateTime quando;
+    }
+
+    private static final String CHAVE = "alarmes_json";
 
     private final SharedPreferences p;
 
@@ -24,27 +26,101 @@ public class Escala {
         p = c.getApplicationContext().getSharedPreferences("escala", Context.MODE_PRIVATE);
     }
 
-    // ---------- configurações ----------
+    // ---------- alarmes ----------
 
-    public boolean ativo() { return p.getBoolean("ativo", true); }
-    public void setAtivo(boolean v) { p.edit().putBoolean("ativo", v).apply(); }
-
-    /** Uma data que foi (ou será) o 1º dia de trabalho de algum ciclo. */
-    public LocalDate inicio() {
-        long e = p.getLong("inicio", Long.MIN_VALUE);
-        return e == Long.MIN_VALUE ? null : LocalDate.ofEpochDay(e);
+    public List<Alarme> alarmes() {
+        String json = p.getString(CHAVE, null);
+        if (json == null) {
+            List<Alarme> migrados = migrarVersaoAntiga();
+            salvar(migrados);
+            return migrados;
+        }
+        List<Alarme> lista = new ArrayList<>();
+        try {
+            JSONArray arr = new JSONArray(json);
+            for (int i = 0; i < arr.length(); i++) {
+                lista.add(Alarme.deJson(arr.getJSONObject(i)));
+            }
+        } catch (Exception ignored) { }
+        return lista;
     }
-    public void setInicio(LocalDate d) { p.edit().putLong("inicio", d.toEpochDay()).apply(); }
 
-    /** dia: 0 a 3 (Dia 1 a Dia 4 de trabalho). */
-    public int hora(int dia) { return p.getInt("hora" + dia, 6); }
-    public int minuto(int dia) { return p.getInt("min" + dia, 0); }
-    public void setHorario(int dia, int h, int m) {
-        p.edit().putInt("hora" + dia, h).putInt("min" + dia, m).apply();
+    public void salvar(List<Alarme> lista) {
+        try {
+            JSONArray arr = new JSONArray();
+            for (Alarme a : lista) arr.put(a.toJson());
+            p.edit().putString(CHAVE, arr.toString()).apply();
+        } catch (Exception ignored) { }
     }
 
-    public boolean diaLigado(int dia) { return p.getBoolean("ligado" + dia, true); }
-    public void setDiaLigado(int dia, boolean v) { p.edit().putBoolean("ligado" + dia, v).apply(); }
+    public Alarme buscar(long id) {
+        for (Alarme a : alarmes()) {
+            if (a.id == id) return a;
+        }
+        return null;
+    }
+
+    public void salvarUm(Alarme novo) {
+        List<Alarme> lista = alarmes();
+        boolean achou = false;
+        for (int i = 0; i < lista.size(); i++) {
+            if (lista.get(i).id == novo.id) {
+                lista.set(i, novo);
+                achou = true;
+                break;
+            }
+        }
+        if (!achou) lista.add(novo);
+        salvar(lista);
+    }
+
+    public void remover(long id) {
+        List<Alarme> lista = alarmes();
+        for (int i = 0; i < lista.size(); i++) {
+            if (lista.get(i).id == id) {
+                lista.remove(i);
+                break;
+            }
+        }
+        salvar(lista);
+    }
+
+    /** O próximo toque entre todos os alarmes, ou null. */
+    public Proximo proximo(LocalDateTime depois) {
+        Proximo melhor = null;
+        for (Alarme a : alarmes()) {
+            LocalDateTime t = a.proximo(depois);
+            if (t != null && (melhor == null || t.isBefore(melhor.quando))) {
+                melhor = new Proximo();
+                melhor.alarme = a;
+                melhor.quando = t;
+            }
+        }
+        return melhor;
+    }
+
+    /** Traz para a lista nova a escala que existia na versão anterior do app. */
+    private List<Alarme> migrarVersaoAntiga() {
+        List<Alarme> lista = new ArrayList<>();
+        if (!p.contains("inicio")) return lista;
+        Alarme a = Alarme.novo();
+        a.nome = "Trabalho";
+        a.tipo = Alarme.CICLO;
+        a.ativo = p.getBoolean("ativo", true);
+        a.ciclo = 10;
+        a.trabalho = 4;
+        a.inicio = p.getLong("inicio", LocalDate.now().toEpochDay());
+        a.horarios = new int[4];
+        for (int i = 0; i < 4; i++) {
+            boolean ligado = p.getBoolean("ligado" + i, true);
+            int m = p.getInt("hora" + i, 6) * 60 + p.getInt("min" + i, 0);
+            a.horarios[i] = ligado ? m : -1;
+        }
+        lista.add(a);
+        return lista;
+    }
+
+    // ---------- configurações gerais ----------
 
     /** Som escolhido (texto de um Uri) ou null para o som de alarme padrão do celular. */
     public String toque() { return p.getString("toque", null); }
@@ -52,44 +128,6 @@ public class Escala {
 
     public int sonecaMinutos() { return p.getInt("soneca", 10); }
 
-    // ---------- conta da escala ----------
-
-    /** Posição da data no ciclo: 0 a 9 (0-3 = trabalho, 4-9 = folga). -1 se não configurado. */
-    public int posicaoNoCiclo(LocalDate d) {
-        LocalDate ini = inicio();
-        if (ini == null) return -1;
-        long n = ChronoUnit.DAYS.between(ini, d);
-        return (int) Math.floorMod(n, (long) DIAS_CICLO);
-    }
-
-    public boolean ehTrabalho(LocalDate d) {
-        int pos = posicaoNoCiclo(d);
-        return pos >= 0 && pos < DIAS_TRABALHO;
-    }
-
-    /** Próximo horário de alarme estritamente depois de "depoisDe", ou null se não houver. */
-    public LocalDateTime proximo(LocalDateTime depoisDe) {
-        if (!ativo() || inicio() == null) return null;
-        LocalDate hoje = depoisDe.toLocalDate();
-        for (int i = 0; i <= DIAS_CICLO + 1; i++) {
-            LocalDate d = hoje.plusDays(i);
-            int pos = posicaoNoCiclo(d);
-            if (pos < DIAS_TRABALHO && diaLigado(pos)) {
-                LocalDateTime t = d.atTime(hora(pos), minuto(pos));
-                if (t.isAfter(depoisDe)) return t;
-            }
-        }
-        return null;
-    }
-
-    public List<LocalDateTime> proximos(int quantos) {
-        List<LocalDateTime> lista = new ArrayList<>();
-        LocalDateTime t = LocalDateTime.now();
-        for (int i = 0; i < quantos; i++) {
-            t = proximo(t);
-            if (t == null) break;
-            lista.add(t);
-        }
-        return lista;
-    }
+    public boolean mostrarContagem() { return p.getBoolean("contagem", true); }
+    public void setMostrarContagem(boolean v) { p.edit().putBoolean("contagem", v).apply(); }
 }

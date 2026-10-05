@@ -32,6 +32,9 @@ public class AlarmeService extends Service {
     static final int NOTIF_ID = 42;
     static final long LIMITE_MS = 10 * 60_000L;
 
+    /** Nome do alarme que está tocando (usado pela soneca e pela tela do alarme). */
+    static String nomeAtual = "Alarme";
+
     private MediaPlayer player;
     private Vibrator vibrador;
     private PowerManager.WakeLock wakeLock;
@@ -44,6 +47,8 @@ public class AlarmeService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        String nome = intent != null ? intent.getStringExtra("nome") : null;
+        nomeAtual = nome != null ? nome : "Alarme";
         Notification n = criarNotificacao();
         if (Build.VERSION.SDK_INT >= 29) {
             startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
@@ -69,6 +74,7 @@ public class AlarmeService extends Service {
     private Intent intentTela() {
         Intent i = new Intent(this, TocandoActivity.class);
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_USER_ACTION);
+        i.putExtra("nome", nomeAtual);
         return i;
     }
 
@@ -96,7 +102,7 @@ public class AlarmeService extends Service {
 
         return new Notification.Builder(this, CANAL)
                 .setSmallIcon(R.drawable.ic_alarme)
-                .setContentTitle("Alarme da escala — " + hora)
+                .setContentTitle(nomeAtual + " — " + hora)
                 .setContentText("Hora de levantar!")
                 .setCategory(Notification.CATEGORY_ALARM)
                 .setVisibility(Notification.VISIBILITY_PUBLIC)

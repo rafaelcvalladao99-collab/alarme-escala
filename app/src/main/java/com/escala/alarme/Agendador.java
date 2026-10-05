@@ -15,28 +15,30 @@ public class Agendador {
     static final int REQ_ESCALA = 1;
     static final int REQ_SONECA = 2;
     static final int REQ_TESTE = 3;
+    static final int REQ_CONTAGEM = 4;
 
-    /** Marca o próximo alarme da escala (a partir de agora). */
+    /** Marca o próximo alarme (a partir de agora). */
     public static void agendar(Context c) {
         agendarDepoisDe(c, LocalDateTime.now());
     }
 
     public static void agendarDepoisDe(Context c, LocalDateTime depoisDe) {
         AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
-        PendingIntent pi = piAlarme(c, REQ_ESCALA);
-        LocalDateTime prox = new Escala(c).proximo(depoisDe);
+        Escala.Proximo prox = new Escala(c).proximo(depoisDe);
         if (prox == null) {
-            am.cancel(pi);
-            return;
+            am.cancel(piAlarme(c, REQ_ESCALA, null));
+        } else {
+            long ms = prox.quando.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+            marcar(c, am, ms, piAlarme(c, REQ_ESCALA, prox.alarme.nome));
         }
-        long ms = prox.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
-        marcar(c, am, ms, pi);
+        Contagem.atualizar(c);
+        Contagem.agendarDiario(c);
     }
 
     /** Alarme avulso (soneca ou teste) daqui a alguns segundos. */
-    public static void agendarAvulso(Context c, int req, long daquiMs) {
+    public static void agendarAvulso(Context c, int req, long daquiMs, String nome) {
         AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
-        marcar(c, am, System.currentTimeMillis() + daquiMs, piAlarme(c, req));
+        marcar(c, am, System.currentTimeMillis() + daquiMs, piAlarme(c, req, nome));
     }
 
     public static boolean podeAgendar(Context c) {
@@ -57,10 +59,11 @@ public class Agendador {
         }
     }
 
-    static PendingIntent piAlarme(Context c, int req) {
+    static PendingIntent piAlarme(Context c, int req, String nome) {
         Intent i = new Intent(c, AlarmeReceiver.class);
         i.setAction(AlarmeReceiver.ACAO_TOCAR);
         i.putExtra("req", req);
+        if (nome != null) i.putExtra("nome", nome);
         return PendingIntent.getBroadcast(c, req, i,
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
     }

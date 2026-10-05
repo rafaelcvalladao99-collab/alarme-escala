@@ -6,12 +6,13 @@ import android.content.Intent;
 
 import java.time.LocalDateTime;
 
-/** Recebe a hora do alarme e os botões "Desligar" / "Soneca" da notificação. */
+/** Recebe a hora do alarme, os botões "Desligar" / "Soneca" e a atualização diária da contagem. */
 public class AlarmeReceiver extends BroadcastReceiver {
 
     static final String ACAO_TOCAR = "com.escala.alarme.TOCAR";
     static final String ACAO_PARAR = "com.escala.alarme.PARAR";
     static final String ACAO_SONECA = "com.escala.alarme.SONECA";
+    static final String ACAO_CONTAGEM = "com.escala.alarme.CONTAGEM";
 
     @Override
     public void onReceive(Context c, Intent intent) {
@@ -20,13 +21,18 @@ public class AlarmeReceiver extends BroadcastReceiver {
             parar(c);
         } else if (ACAO_SONECA.equals(acao)) {
             soneca(c);
+        } else if (ACAO_CONTAGEM.equals(acao)) {
+            Contagem.atualizar(c);
+            Contagem.agendarDiario(c);
         } else if (ACAO_TOCAR.equals(acao)) {
             int req = intent.getIntExtra("req", Agendador.REQ_ESCALA);
             if (req == Agendador.REQ_ESCALA) {
-                // Já deixa marcado o próximo dia de trabalho.
+                // Já deixa marcado o próximo toque.
                 Agendador.agendarDepoisDe(c, LocalDateTime.now().plusMinutes(1));
             }
             Intent s = new Intent(c, AlarmeService.class);
+            String nome = intent.getStringExtra("nome");
+            if (nome != null) s.putExtra("nome", nome);
             c.startForegroundService(s);
         }
     }
@@ -37,7 +43,7 @@ public class AlarmeReceiver extends BroadcastReceiver {
 
     static void soneca(Context c) {
         int min = new Escala(c).sonecaMinutos();
-        Agendador.agendarAvulso(c, Agendador.REQ_SONECA, min * 60_000L);
+        Agendador.agendarAvulso(c, Agendador.REQ_SONECA, min * 60_000L, AlarmeService.nomeAtual);
         parar(c);
     }
 }

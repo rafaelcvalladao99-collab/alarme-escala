@@ -9,6 +9,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
@@ -19,16 +20,14 @@ import android.os.PowerManager;
 import android.provider.Settings;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.View;
 import android.widget.Button;
-import android.widget.CheckBox;
 import android.widget.LinearLayout;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
 
@@ -39,10 +38,8 @@ public class MainActivity extends Activity {
     private static final Locale BR = Locale.forLanguageTag("pt-BR");
 
     private Escala escala;
-    private Switch swAtivo;
-    private TextView txtInicio, txtHoje, txtProximos;
     private Button btnSom;
-    private LinearLayout avisos, dias;
+    private LinearLayout avisos, lista;
     private TextView txtVersao;
     private Atualizador.Info novaVersao;
     private boolean baixando = false;
@@ -53,24 +50,22 @@ public class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
         escala = new Escala(this);
 
-        swAtivo = findViewById(R.id.swAtivo);
-        txtInicio = findViewById(R.id.txtInicio);
-        txtHoje = findViewById(R.id.txtHoje);
-        txtProximos = findViewById(R.id.txtProximos);
         btnSom = findViewById(R.id.btnSom);
         avisos = findViewById(R.id.avisos);
-        dias = findViewById(R.id.dias);
+        lista = findViewById(R.id.lista);
 
-        swAtivo.setChecked(escala.ativo());
-        swAtivo.setOnCheckedChangeListener((b, v) -> {
-            escala.setAtivo(v);
-            atualizar();
+        Switch swContagem = findViewById(R.id.swContagem);
+        swContagem.setChecked(escala.mostrarContagem());
+        swContagem.setOnCheckedChangeListener((b, v) -> {
+            escala.setMostrarContagem(v);
+            Contagem.atualizar(this);
         });
 
-        findViewById(R.id.btnInicio).setOnClickListener(v -> escolherInicio());
+        findViewById(R.id.btnNovo).setOnClickListener(v ->
+                startActivity(new Intent(this, EditarActivity.class)));
         btnSom.setOnClickListener(v -> escolherSom());
         findViewById(R.id.btnTestar).setOnClickListener(v -> {
-            Agendador.agendarAvulso(this, Agendador.REQ_TESTE, 10_000L);
+            Agendador.agendarAvulso(this, Agendador.REQ_TESTE, 10_000L, "Teste");
             Toast.makeText(this, "Pode bloquear a tela. O alarme toca em 10 segundos.",
                     Toast.LENGTH_LONG).show();
         });
@@ -139,79 +134,79 @@ public class MainActivity extends Activity {
     private void atualizar() {
         Agendador.agendar(this);
         montarAvisos();
-        montarDias();
-
-        LocalDate ini = escala.inicio();
-        if (ini == null) {
-            txtInicio.setText("Ainda não escolhido");
-            txtHoje.setText("Escolha a data de um 1º dia de trabalho para o alarme começar a funcionar.");
-        } else {
-            txtInicio.setText(ini.format(DateTimeFormatter.ofPattern("EEEE, dd/MM/yyyy", BR)));
-            int pos = escala.posicaoNoCiclo(LocalDate.now());
-            String hoje = pos < Escala.DIAS_TRABALHO
-                    ? "Hoje: dia " + (pos + 1) + " de trabalho"
-                    : "Hoje: folga (" + (pos - Escala.DIAS_TRABALHO + 1) + "º de 6 dias)";
-            txtHoje.setText(hoje);
-        }
-
+        montarLista();
         btnSom.setText("Som: " + nomeDoSom());
-
-        List<LocalDateTime> prox = escala.proximos(8);
-        if (!escala.ativo()) {
-            txtProximos.setText("Alarme desligado.");
-        } else if (prox.isEmpty()) {
-            txtProximos.setText("Nenhum alarme marcado.");
-        } else {
-            DateTimeFormatter f = DateTimeFormatter.ofPattern("EEE, dd/MM 'às' HH:mm", BR);
-            StringBuilder sb = new StringBuilder();
-            for (LocalDateTime t : prox) {
-                int pos = escala.posicaoNoCiclo(t.toLocalDate());
-                if (sb.length() > 0) sb.append('\n');
-                sb.append("•  ").append(t.format(f)).append("   (dia ").append(pos + 1).append(")");
-            }
-            txtProximos.setText(sb.toString());
-        }
     }
 
-    private void montarDias() {
-        dias.removeAllViews();
-        for (int i = 0; i < Escala.DIAS_TRABALHO; i++) {
-            final int dia = i;
-            LinearLayout linha = new LinearLayout(this);
-            linha.setOrientation(LinearLayout.HORIZONTAL);
-            linha.setGravity(Gravity.CENTER_VERTICAL);
-
-            CheckBox cb = new CheckBox(this);
-            cb.setText("Dia " + (i + 1));
-            cb.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
-            cb.setChecked(escala.diaLigado(i));
-            cb.setOnCheckedChangeListener((b, v) -> {
-                escala.setDiaLigado(dia, v);
-                atualizar();
-            });
-            linha.addView(cb, new LinearLayout.LayoutParams(0,
-                    LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-
-            Button hora = new Button(this);
-            hora.setText(String.format(Locale.ROOT, "%02d:%02d", escala.hora(i), escala.minuto(i)));
-            hora.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
-            hora.setEnabled(escala.diaLigado(i));
-            hora.setOnClickListener(v -> new TimePickerDialog(this, (tp, h, m) -> {
-                escala.setHorario(dia, h, m);
-                atualizar();
-            }, escala.hora(dia), escala.minuto(dia), true).show());
-            linha.addView(hora);
-
-            dias.addView(linha);
+    private void montarLista() {
+        lista.removeAllViews();
+        List<Alarme> todos = escala.alarmes();
+        if (todos.isEmpty()) {
+            TextView vazio = new TextView(this);
+            vazio.setText("Nenhum alarme ainda. Toque em \"+ Novo alarme\" para criar o primeiro.");
+            vazio.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+            vazio.setAlpha(0.7f);
+            lista.addView(vazio);
+            return;
         }
+        for (Alarme a : todos) lista.addView(cartao(a));
     }
 
-    private void escolherInicio() {
-        LocalDate d = escala.inicio() != null ? escala.inicio() : LocalDate.now();
-        new DatePickerDialog(this, (dp, ano, mes, dia) -> {
-            escala.setInicio(LocalDate.of(ano, mes + 1, dia));
+    private View cartao(Alarme a) {
+        LinearLayout linha = new LinearLayout(this);
+        linha.setOrientation(LinearLayout.HORIZONTAL);
+        linha.setGravity(Gravity.CENTER_VERTICAL);
+        int p = dp(14);
+        linha.setPadding(p, p, p, p);
+        GradientDrawable fundo = new GradientDrawable();
+        fundo.setColor(Color.parseColor("#22808080"));
+        fundo.setCornerRadius(dp(12));
+        linha.setBackground(fundo);
+
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+
+        TextView nome = new TextView(this);
+        nome.setText(a.nome);
+        nome.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+        nome.setTypeface(null, Typeface.BOLD);
+        col.addView(nome);
+
+        TextView resumo = new TextView(this);
+        resumo.setText(a.resumo());
+        resumo.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        resumo.setAlpha(0.7f);
+        col.addView(resumo);
+
+        LocalDateTime prox = a.proximo(LocalDateTime.now());
+        TextView proximo = new TextView(this);
+        if (!a.ativo) proximo.setText("Desligado");
+        else if (prox == null) proximo.setText("Sem próximo alarme");
+        else proximo.setText("Próximo: " + Contagem.quando(prox));
+        proximo.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        proximo.setPadding(0, dp(4), 0, 0);
+        col.addView(proximo);
+
+        linha.addView(col, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        Switch sw = new Switch(this);
+        sw.setChecked(a.ativo);
+        sw.setOnCheckedChangeListener((b, v) -> {
+            a.ativo = v;
+            escala.salvarUm(a);
             atualizar();
-        }, d.getYear(), d.getMonthValue() - 1, d.getDayOfMonth()).show();
+        });
+        linha.addView(sw);
+
+        linha.setOnClickListener(v -> startActivity(
+                new Intent(this, EditarActivity.class).putExtra("id", a.id)));
+
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.bottomMargin = dp(10);
+        linha.setLayoutParams(lp);
+        return linha;
     }
 
     private void escolherSom() {

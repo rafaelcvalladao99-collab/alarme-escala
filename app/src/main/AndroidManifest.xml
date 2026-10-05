@@ -30,6 +30,11 @@
         </activity>
 
         <activity
+            android:name=".EditarActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".TocandoActivity"
             android:exported="false"
             android:excludeFromRecents="true"

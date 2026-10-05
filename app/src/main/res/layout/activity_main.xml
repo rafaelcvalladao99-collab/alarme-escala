@@ -22,7 +22,7 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
             android:alpha="0.7"
-            android:text="4 dias de trabalho, 6 de folga — repete a cada 10 dias"
+            android:text="Crie quantos alarmes quiser, cada um com a sua regra"
             android:textSize="15sp" />
 
         <LinearLayout
@@ -31,48 +31,22 @@
             android:layout_height="wrap_content"
             android:orientation="vertical" />
 
-        <Switch
-            android:id="@+id/swAtivo"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingVertical="8dp"
-            android:text="Alarme ligado"
-            android:textSize="20sp"
-            android:textStyle="bold" />
-
         <TextView
             style="@style/Titulo"
-            android:text="1º dia de trabalho de um ciclo" />
-
-        <TextView
-            android:id="@+id/txtInicio"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textSize="18sp" />
-
-        <Button
-            android:id="@+id/btnInicio"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Escolher data" />
-
-        <TextView
-            android:id="@+id/txtHoje"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:textSize="16sp"
-            android:textStyle="italic" />
-
-        <TextView
-            style="@style/Titulo"
-            android:text="Horário de cada dia de trabalho" />
+            android:text="Meus alarmes" />
 
         <LinearLayout
-            android:id="@+id/dias"
+            android:id="@+id/lista"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical" />
+
+        <Button
+            android:id="@+id/btnNovo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="+ Novo alarme" />
 
         <TextView
             style="@style/Titulo"
@@ -86,13 +60,14 @@
 
         <TextView
             style="@style/Titulo"
-            android:text="Próximos alarmes" />
+            android:text="Notificação" />
 
-        <TextView
-            android:id="@+id/txtProximos"
+        <Switch
+            android:id="@+id/swContagem"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:lineSpacingExtra="6dp"
+            android:paddingVertical="8dp"
+            android:text="Mostrar quantos dias faltam para cada alarme"
             android:textSize="16sp" />
 
         <Button

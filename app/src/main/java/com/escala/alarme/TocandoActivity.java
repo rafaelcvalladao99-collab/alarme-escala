@@ -44,14 +44,9 @@ public class TocandoActivity extends Activity {
         Button soneca = findViewById(R.id.btnSoneca);
 
         hora.setText(LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm")));
-        Escala e = new Escala(this);
-        int pos = e.posicaoNoCiclo(LocalDate.now());
-        if (pos >= 0 && pos < Escala.DIAS_TRABALHO) {
-            info.setText("Dia " + (pos + 1) + " de trabalho");
-        } else {
-            info.setText("Alarme");
-        }
-        soneca.setText("Soneca (" + e.sonecaMinutos() + " min)");
+        String nome = getIntent().getStringExtra("nome");
+        info.setText(nome != null ? nome : "Alarme");
+        soneca.setText("Soneca (" + new Escala(this).sonecaMinutos() + " min)");
 
         desligar.setOnClickListener(v -> {
             AlarmeReceiver.parar(this);

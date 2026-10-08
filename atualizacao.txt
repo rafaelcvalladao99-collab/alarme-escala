@@ -1,0 +1,1364 @@
+@@@FILE app/src/main/res/values/colors.xml
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="fundo_icone">#1E6FB8</color>
+
+    <!-- Tema claro. Para trocar a paleta do app, basta mudar estes valores e os de values-night. -->
+    <color name="bg">#F2F6F6</color>
+    <color name="card">#FFFFFF</color>
+    <color name="ink">#0F1D1F</color>
+    <color name="mute">#4A6064</color>
+    <color name="line">#D2DEDF</color>
+    <color name="ciclo">#00696B</color>
+    <color name="ciclo_soft">#D4F2F0</color>
+    <color name="mensal">#8F4300</color>
+    <color name="mensal_soft">#FFEBD3</color>
+    <color name="primary">#00696B</color>
+    <color name="on_primary">#FFFFFF</color>
+    <color name="danger">#B3261E</color>
+</resources>
+@@@FILE app/src/main/res/values-night/colors.xml
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg">#0E1517</color>
+    <color name="card">#172125</color>
+    <color name="ink">#E6EEEF</color>
+    <color name="mute">#9DB1B4</color>
+    <color name="line">#2A383D</color>
+    <color name="ciclo">#4FD8D0</color>
+    <color name="ciclo_soft">#12363A</color>
+    <color name="mensal">#FFBA70</color>
+    <color name="mensal_soft">#3B2A14</color>
+    <color name="primary">#4FD8D0</color>
+    <color name="on_primary">#00201F</color>
+    <color name="danger">#FF9D95</color>
+</resources>
+@@@FILE app/src/main/res/values/themes.xml
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Tema" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:colorPrimary">@color/primary</item>
+        <item name="android:colorAccent">@color/primary</item>
+        <item name="android:windowBackground">@color/bg</item>
+        <item name="android:statusBarColor">@color/bg</item>
+        <item name="android:navigationBarColor">@color/bg</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:textColorPrimary">@color/ink</item>
+        <item name="android:textColorSecondary">@color/mute</item>
+    </style>
+
+    <style name="Tema.Tocando" parent="android:Theme.Material.NoActionBar.Fullscreen">
+        <item name="android:windowBackground">#0B1214</item>
+    </style>
+</resources>
+@@@FILE app/src/main/res/values-night/themes.xml
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Tema" parent="android:Theme.Material.NoActionBar">
+        <item name="android:colorPrimary">@color/primary</item>
+        <item name="android:colorAccent">@color/primary</item>
+        <item name="android:windowBackground">@color/bg</item>
+        <item name="android:statusBarColor">@color/bg</item>
+        <item name="android:navigationBarColor">@color/bg</item>
+        <item name="android:textColorPrimary">@color/ink</item>
+        <item name="android:textColorSecondary">@color/mute</item>
+    </style>
+</resources>
+@@@FILE app/src/main/res/layout/activity_main.xml
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:paddingBottom="100dp">
+
+        <LinearLayout
+            android:id="@+id/conteudo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/titulo"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Alarmes"
+                        android:textSize="30sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/subtitulo"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="15sp" />
+                </LinearLayout>
+
+                <ImageButton
+                    android:id="@+id/btnConfig"
+                    android:layout_width="52dp"
+                    android:layout_height="52dp"
+                    android:contentDescription="Configurações"
+                    android:src="@drawable/ic_engrenagem" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/avisos"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical" />
+
+            <LinearLayout
+                android:id="@+id/lista"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="vertical" />
+        </LinearLayout>
+    </ScrollView>
+
+    <Button
+        android:id="@+id/btnNovo"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:layout_gravity="bottom"
+        android:layout_margin="16dp"
+        android:text="+  Novo alarme" />
+</FrameLayout>
+@@@FILE app/src/main/res/layout/activity_tocando.xml
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0B1214"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:padding="28dp">
+
+    <View
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <ImageView
+        android:layout_width="120dp"
+        android:layout_height="120dp"
+        android:background="@drawable/bg_pulso"
+        android:contentDescription="Alarme tocando"
+        android:padding="34dp"
+        android:src="@drawable/ic_alarme"
+        android:tint="#4FD8D0" />
+
+    <TextView
+        android:id="@+id/hora"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="18dp"
+        android:textColor="#F2F6F6"
+        android:textSize="84sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/info"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="#F2F6F6"
+        android:textSize="26sp"
+        android:textStyle="bold" />
+
+    <View
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <Button
+        android:id="@+id/btnDesligar"
+        android:layout_width="match_parent"
+        android:layout_height="96dp"
+        android:background="@drawable/bg_desligar"
+        android:stateListAnimator="@null"
+        android:text="Desligar"
+        android:textAllCaps="false"
+        android:textColor="#0B1214"
+        android:textSize="28sp"
+        android:textStyle="bold" />
+
+    <Button
+        android:id="@+id/btnSoneca"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/bg_soneca"
+        android:stateListAnimator="@null"
+        android:textAllCaps="false"
+        android:textColor="#F2F6F6"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+</LinearLayout>
+@@@FILE app/src/main/res/drawable/ic_engrenagem.xml
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M19.14,12.94c0.04,-0.3 0.06,-0.61 0.06,-0.94c0,-0.32 -0.02,-0.64 -0.07,-0.94l2.03,-1.58c0.18,-0.14 0.23,-0.41 0.12,-0.61l-1.92,-3.32c-0.12,-0.22 -0.37,-0.29 -0.59,-0.22l-2.39,0.96c-0.5,-0.38 -1.03,-0.7 -1.62,-0.94L14.4,2.81c-0.04,-0.24 -0.24,-0.41 -0.48,-0.41h-3.84c-0.24,0 -0.43,0.17 -0.47,0.41L9.25,5.35C8.66,5.59 8.12,5.92 7.63,6.29L5.24,5.33c-0.22,-0.08 -0.47,0 -0.59,0.22L2.74,8.87C2.62,9.08 2.66,9.34 2.86,9.48l2.03,1.58C4.84,11.36 4.8,11.69 4.8,12s0.02,0.64 0.07,0.94l-2.03,1.58c-0.18,0.14 -0.23,0.41 -0.12,0.61l1.92,3.32c0.12,0.22 0.37,0.29 0.59,0.22l2.39,-0.96c0.5,0.38 1.03,0.7 1.62,0.94l0.36,2.54c0.05,0.24 0.24,0.41 0.48,0.41h3.84c0.24,0 0.44,-0.17 0.47,-0.41l0.36,-2.54c0.59,-0.24 1.13,-0.56 1.62,-0.94l2.39,0.96c0.22,0.08 0.47,0 0.59,-0.22l1.92,-3.32c0.12,-0.22 0.07,-0.47 -0.12,-0.61L19.14,12.94zM12,15.6c-1.98,0 -3.6,-1.62 -3.6,-3.6s1.62,-3.6 3.6,-3.6s3.6,1.62 3.6,3.6S13.98,15.6 12,15.6z" />
+</vector>
+@@@FILE app/src/main/res/drawable/ic_mais.xml
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M19,13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+</vector>
+@@@FILE app/src/main/res/drawable/ic_voltar.xml
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M20,11H7.83l5.59,-5.59L12,4l-8,8 8,8 1.41,-1.41L7.83,13H20v-2z" />
+</vector>
+@@@FILE app/src/main/res/drawable/ic_ciclo.xml
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M7,7h10v3l4,-4 -4,-4v3H5v6h2V7zM17,17H7v-3l-4,4 4,4v-3h12v-6h-2v4z" />
+</vector>
+@@@FILE app/src/main/res/drawable/ic_calendario.xml
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M17,12h-5v5h5v-5zM16,1v2H8V1H6v2H5c-1.11,0 -1.99,0.9 -1.99,2L3,19c0,1.1 0.89,2 2,2h14c1.1,0 2,-0.9 2,-2V5c0,-1.1 -0.9,-2 -2,-2h-1V1h-2zM19,19H5V8h14v11z" />
+</vector>
+@@@FILE app/src/main/res/drawable/bg_desligar.xml
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#F2F6F6" />
+    <corners android:radius="28dp" />
+</shape>
+@@@FILE app/src/main/res/drawable/bg_soneca.xml
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#00000000" />
+    <stroke android:width="2dp" android:color="#3A4B50" />
+    <corners android:radius="20dp" />
+</shape>
+@@@FILE app/src/main/res/drawable/bg_pulso.xml
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+    <solid android:color="#00000000" />
+    <stroke android:width="3dp" android:color="#4FD8D0" />
+</shape>
+@@@FILE app/src/main/java/com/escala/alarme/Ui.java
+package com.escala.alarme;
+
+import android.content.Context;
+import android.content.res.ColorStateList;
+import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
+import android.text.Editable;
+import android.text.InputType;
+import android.text.TextWatcher;
+import android.util.TypedValue;
+import android.view.Gravity;
+import android.widget.Button;
+import android.widget.CompoundButton;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.Switch;
+import android.widget.TextView;
+
+/** Pequenas peças de interface compartilhadas pelas telas do app. */
+final class Ui {
+
+    static final int PRIMARIO = 0;
+    static final int CONTORNO = 1;
+    static final int PERIGO = 2;
+
+    private Ui() { }
+
+    static int dp(Context c, float v) {
+        return Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v,
+                c.getResources().getDisplayMetrics()));
+    }
+
+    static int cor(Context c, int id) {
+        return c.getColor(id);
+    }
+
+    static GradientDrawable forma(Context c, int fundo, int borda, float raioDp, float tracoDp) {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(fundo);
+        g.setCornerRadius(dp(c, raioDp));
+        if (borda != 0 && tracoDp > 0) g.setStroke(dp(c, tracoDp), borda);
+        return g;
+    }
+
+    static Drawable ondulado(Drawable fundo) {
+        return new RippleDrawable(ColorStateList.valueOf(0x33808080), fundo, null);
+    }
+
+    static TextView texto(Context c, CharSequence t, float sp, boolean negrito, int cor) {
+        TextView v = new TextView(c);
+        v.setText(t);
+        v.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
+        v.setTextColor(cor);
+        if (negrito) v.setTypeface(null, Typeface.BOLD);
+        return v;
+    }
+
+    static LinearLayout.LayoutParams largura() {
+        return new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+    }
+
+    static LinearLayout.LayoutParams largura(Context c, float topoDp) {
+        LinearLayout.LayoutParams lp = largura();
+        lp.topMargin = dp(c, topoDp);
+        return lp;
+    }
+
+    static Button botao(Context c, String t, int estilo) {
+        Button b = new Button(c);
+        b.setText(t);
+        b.setAllCaps(false);
+        b.setStateListAnimator(null);
+        b.setTypeface(null, Typeface.BOLD);
+        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        b.setMinHeight(dp(c, 56));
+        b.setMinimumHeight(dp(c, 56));
+        int fundo;
+        int borda;
+        int txt;
+        if (estilo == PRIMARIO) {
+            fundo = cor(c, R.color.primary);
+            borda = fundo;
+            txt = cor(c, R.color.on_primary);
+        } else if (estilo == PERIGO) {
+            fundo = 0;
+            borda = 0;
+            txt = cor(c, R.color.danger);
+        } else {
+            fundo = cor(c, R.color.card);
+            borda = cor(c, R.color.line);
+            txt = cor(c, R.color.ink);
+        }
+        b.setBackground(ondulado(forma(c, fundo, borda, 16, 2)));
+        b.setTextColor(txt);
+        return b;
+    }
+
+    static Switch interruptor(Context c, boolean ligado, CompoundButton.OnCheckedChangeListener l) {
+        Switch s = new Switch(c);
+        s.setChecked(ligado);
+        int[][] estados = {{android.R.attr.state_checked}, {}};
+        s.setThumbTintList(new ColorStateList(estados,
+                new int[]{cor(c, R.color.on_primary), cor(c, R.color.mute)}));
+        s.setTrackTintList(new ColorStateList(estados,
+                new int[]{cor(c, R.color.primary), cor(c, R.color.line)}));
+        s.setScaleX(1.2f);
+        s.setScaleY(1.2f);
+        s.setOnCheckedChangeListener(l);
+        return s;
+    }
+
+    interface Mudou {
+        void valor(int v);
+    }
+
+    /** Número com botões − e +, e o campo no meio também aceita digitar. */
+    static class Passo extends LinearLayout {
+        final EditText campo;
+        int min;
+        int max;
+
+        Passo(Context c, int min, int max, Mudou mudou) {
+            super(c);
+            this.min = min;
+            this.max = max;
+            setOrientation(HORIZONTAL);
+            setGravity(Gravity.CENTER_VERTICAL);
+
+            Button menos = botaoPasso(c, "−");
+            Button mais = botaoPasso(c, "+");
+            campo = new EditText(c);
+            campo.setInputType(InputType.TYPE_CLASS_NUMBER);
+            campo.setSingleLine(true);
+            campo.setGravity(Gravity.CENTER);
+            campo.setTextSize(TypedValue.COMPLEX_UNIT_SP, 28);
+            campo.setTypeface(null, Typeface.BOLD);
+            campo.setTextColor(cor(c, R.color.ink));
+
+            addView(menos);
+            addView(campo, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
+            addView(mais);
+
+            menos.setOnClickListener(v -> definir(limitar(valor(min) - 1)));
+            mais.setOnClickListener(v -> definir(limitar(valor(min) + 1)));
+            campo.addTextChangedListener(new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence s, int a, int b, int d) { }
+
+                @Override
+                public void onTextChanged(CharSequence s, int a, int b, int d) { }
+
+                @Override
+                public void afterTextChanged(Editable s) {
+                    int v = valor(-1);
+                    if (v >= Passo.this.min && v <= Passo.this.max) mudou.valor(v);
+                }
+            });
+        }
+
+        private static Button botaoPasso(Context c, String t) {
+            Button b = botao(c, t, CONTORNO);
+            b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 28);
+            b.setMinWidth(0);
+            b.setMinimumWidth(0);
+            b.setPadding(0, 0, 0, 0);
+            b.setLayoutParams(new LayoutParams(dp(c, 56), dp(c, 56)));
+            return b;
+        }
+
+        private int limitar(int v) {
+            return Math.max(min, Math.min(max, v));
+        }
+
+        int valor(int padrao) {
+            try {
+                return Integer.parseInt(campo.getText().toString().trim());
+            } catch (Exception e) {
+                return padrao;
+            }
+        }
+
+        void definir(int v) {
+            campo.setText(String.valueOf(v));
+        }
+    }
+}
+@@@FILE app/src/main/java/com/escala/alarme/MainActivity.java
+package com.escala.alarme;
+
+import android.Manifest;
+import android.app.Activity;
+import android.app.NotificationManager;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.graphics.drawable.Drawable;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.PowerManager;
+import android.provider.Settings;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.Button;
+import android.widget.ImageButton;
+import android.widget.LinearLayout;
+import android.widget.Switch;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Locale;
+
+public class MainActivity extends Activity {
+
+    private static final int PEDIR_NOTIF = 1;
+    private static final Locale BR = Locale.forLanguageTag("pt-BR");
+
+    private Escala escala;
+    private LinearLayout avisos, lista;
+    private TextView txtVersao, subtitulo;
+    private Atualizador.Info novaVersao;
+    private boolean baixando = false;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        escala = new Escala(this);
+
+        avisos = findViewById(R.id.avisos);
+        lista = findViewById(R.id.lista);
+        subtitulo = findViewById(R.id.subtitulo);
+        subtitulo.setTextColor(Ui.cor(this, R.color.mute));
+        ((TextView) findViewById(R.id.titulo)).setTextColor(Ui.cor(this, R.color.ink));
+
+        ImageButton config = findViewById(R.id.btnConfig);
+        Drawable engrenagem = getDrawable(R.drawable.ic_engrenagem).mutate();
+        engrenagem.setTint(Ui.cor(this, R.color.ink));
+        config.setImageDrawable(engrenagem);
+        config.setBackground(Ui.ondulado(Ui.forma(this, Ui.cor(this, R.color.card),
+                Ui.cor(this, R.color.line), 14, 2)));
+        config.setOnClickListener(v -> startActivity(new Intent(this, ConfigActivity.class)));
+
+        Button novo = findViewById(R.id.btnNovo);
+        novo.setAllCaps(false);
+        novo.setStateListAnimator(null);
+        novo.setTextSize(18);
+        novo.setTypeface(null, android.graphics.Typeface.BOLD);
+        novo.setTextColor(Ui.cor(this, R.color.on_primary));
+        novo.setBackground(Ui.ondulado(Ui.forma(this, Ui.cor(this, R.color.primary), 0, 20, 0)));
+        novo.setOnClickListener(v -> startActivity(new Intent(this, EditarActivity.class)));
+
+        if (Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, PEDIR_NOTIF);
+        }
+
+        // Rodapé: versão instalada e botão de atualização.
+        LinearLayout conteudo = findViewById(R.id.conteudo);
+        txtVersao = Ui.texto(this, "", 14, false, Ui.cor(this, R.color.mute));
+        txtVersao.setGravity(Gravity.CENTER);
+        txtVersao.setPadding(0, Ui.dp(this, 16), 0, Ui.dp(this, 4));
+        conteudo.addView(txtVersao, Ui.largura());
+        Button btnVerificar = Ui.botao(this, "Verificar atualização", Ui.CONTORNO);
+        btnVerificar.setOnClickListener(v -> verificarAtualizacao(true));
+        conteudo.addView(btnVerificar, Ui.largura());
+        txtVersao.setText("Versão " + Atualizador.versaoInstalada(this));
+        verificarAtualizacao(false);
+    }
+
+    private void verificarAtualizacao(boolean manual) {
+        String base = "Versão " + Atualizador.versaoInstalada(this);
+        if (manual) txtVersao.setText(base + " — verificando...");
+        Atualizador.verificar(this, (nova, erro) -> {
+            if (isDestroyed()) return;
+            novaVersao = nova;
+            if (nova != null) {
+                txtVersao.setText(base + " — versão " + nova.versao + " disponível");
+            } else if (erro != null) {
+                txtVersao.setText(manual ? base + " — não foi possível verificar (" + erro + ")" : base);
+            } else {
+                txtVersao.setText(base + " — você está na última versão");
+            }
+            montarAvisos();
+        });
+    }
+
+    private void iniciarAtualizacao() {
+        if (baixando || novaVersao == null) return;
+        if (!getPackageManager().canRequestPackageInstalls()) {
+            Toast.makeText(this, "Permita instalar apps por aqui e depois toque em Atualizar de novo.",
+                    Toast.LENGTH_LONG).show();
+            abrir(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                    Uri.parse("package:" + getPackageName())));
+            return;
+        }
+        baixando = true;
+        Atualizador.baixarEInstalar(this, novaVersao, (texto, terminou) -> {
+            if (isDestroyed()) return;
+            txtVersao.setText(texto);
+            if (terminou) baixando = false;
+        });
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        atualizar();
+    }
+
+    /** Redesenha a tela e remarca o próximo alarme. */
+    private void atualizar() {
+        Agendador.agendar(this);
+        String data = LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, dd/MM", BR));
+        subtitulo.setText(data.substring(0, 1).toUpperCase(BR) + data.substring(1));
+        montarAvisos();
+        montarLista();
+    }
+
+    private void montarLista() {
+        lista.removeAllViews();
+        List<Alarme> todos = escala.alarmes();
+        if (todos.isEmpty()) {
+            TextView vazio = Ui.texto(this,
+                    "Nenhum alarme ainda. Toque em \"+ Novo alarme\" para criar o primeiro.",
+                    16, false, Ui.cor(this, R.color.mute));
+            lista.addView(vazio, Ui.largura());
+            return;
+        }
+        for (Alarme a : todos) lista.addView(cartao(a));
+    }
+
+    // ---------- cartão de cada alarme ----------
+
+    private View cartao(Alarme a) {
+        boolean ciclo = a.tipo == Alarme.CICLO;
+        int corTipo = Ui.cor(this, ciclo ? R.color.ciclo : R.color.mensal);
+        int corSoft = Ui.cor(this, ciclo ? R.color.ciclo_soft : R.color.mensal_soft);
+        int ink = Ui.cor(this, R.color.ink);
+        int mute = Ui.cor(this, R.color.mute);
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        int p = Ui.dp(this, 16);
+        card.setPadding(p, p, p, p);
+        card.setBackground(Ui.ondulado(Ui.forma(this, Ui.cor(this, R.color.card),
+                Ui.cor(this, R.color.line), 20, 2)));
+        card.setAlpha(a.ativo ? 1f : 0.62f);
+
+        // linha de cima: tipo + interruptor
+        LinearLayout topo = new LinearLayout(this);
+        topo.setGravity(Gravity.CENTER_VERTICAL);
+        TextView tag = Ui.texto(this, ciclo ? "Escala de trabalho" : "Todo mês", 13, true, corTipo);
+        Drawable icone = getDrawable(ciclo ? R.drawable.ic_ciclo : R.drawable.ic_calendario).mutate();
+        icone.setTint(corTipo);
+        int d16 = Ui.dp(this, 16);
+        icone.setBounds(0, 0, d16, d16);
+        tag.setCompoundDrawables(icone, null, null, null);
+        tag.setCompoundDrawablePadding(Ui.dp(this, 6));
+        tag.setBackground(Ui.forma(this, corSoft, 0, 999, 0));
+        tag.setPadding(Ui.dp(this, 10), Ui.dp(this, 4), Ui.dp(this, 12), Ui.dp(this, 4));
+        topo.addView(tag);
+        View espaco = new View(this);
+        topo.addView(espaco, new LinearLayout.LayoutParams(0, 1, 1f));
+        Switch sw = Ui.interruptor(this, a.ativo, (b, v) -> {
+            a.ativo = v;
+            escala.salvarUm(a);
+            atualizar();
+        });
+        topo.addView(sw);
+        card.addView(topo, Ui.largura());
+
+        card.addView(Ui.texto(this, a.nome, 18, true, ink), Ui.largura(this, 8));
+
+        LocalDateTime prox = a.proximo(LocalDateTime.now());
+        TextView hora = Ui.texto(this, prox != null ? Alarme.hhmm(prox.getHour() * 60 + prox.getMinute()) : "—:—",
+                44, true, ink);
+        hora.setFontFeatureSettings("tnum");
+        card.addView(hora, Ui.largura(this, 4));
+
+        LinearLayout quando = new LinearLayout(this);
+        quando.setGravity(Gravity.CENTER_VERTICAL);
+        if (!a.ativo) {
+            quando.addView(Ui.texto(this, "Desligado", 15, false, mute));
+        } else if (prox == null) {
+            quando.addView(Ui.texto(this, "Sem próximo alarme", 15, false, mute));
+        } else {
+            long dias = ChronoUnit.DAYS.between(LocalDate.now(), prox.toLocalDate());
+            String rotulo = dias <= 0 ? "hoje" : dias == 1 ? "amanhã" : "em " + dias + " dias";
+            TextView chip = Ui.texto(this, rotulo, 13, true, Ui.cor(this, R.color.bg));
+            chip.setBackground(Ui.forma(this, ink, 0, 8, 0));
+            chip.setPadding(Ui.dp(this, 8), Ui.dp(this, 2), Ui.dp(this, 8), Ui.dp(this, 2));
+            quando.addView(chip);
+            String data = prox.format(DateTimeFormatter.ofPattern("EEE, dd/MM", BR));
+            if (!ciclo) data += " · todo dia " + a.diaMes;
+            TextView dt = Ui.texto(this, data, 15, false, mute);
+            dt.setPadding(Ui.dp(this, 8), 0, 0, 0);
+            quando.addView(dt);
+        }
+        card.addView(quando, Ui.largura());
+
+        if (ciclo) card.addView(faixa(a), Ui.largura(this, 12));
+
+        card.setOnClickListener(v -> startActivity(
+                new Intent(this, EditarActivity.class).putExtra("id", a.id)));
+
+        LinearLayout.LayoutParams lp = Ui.largura();
+        lp.bottomMargin = Ui.dp(this, 12);
+        card.setLayoutParams(lp);
+        return card;
+    }
+
+    /** Faixa com um quadradinho por dia do ciclo: cheio = trabalho, contorno forte = hoje. */
+    private View faixa(Alarme a) {
+        int hoje = a.posicao(LocalDate.now());
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+
+        if (a.ciclo <= 14) {
+            LinearLayout fila = new LinearLayout(this);
+            for (int i = 0; i < a.ciclo; i++) {
+                boolean trab = i < a.trabalho;
+                TextView t = Ui.texto(this, String.valueOf(i + 1), 12, true,
+                        Ui.cor(this, trab ? R.color.on_primary : R.color.mute));
+                t.setGravity(Gravity.CENTER);
+                int fundo = trab ? Ui.cor(this, R.color.ciclo) : 0;
+                int borda = i == hoje ? Ui.cor(this, R.color.ink)
+                        : Ui.cor(this, trab ? R.color.ciclo : R.color.line);
+                t.setBackground(Ui.forma(this, fundo, borda, 8, i == hoje ? 3 : 2));
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, Ui.dp(this, 30), 1f);
+                lp.setMargins(Ui.dp(this, 2), 0, Ui.dp(this, 2), 0);
+                fila.addView(t, lp);
+            }
+            col.addView(fila, Ui.largura());
+        }
+
+        String esquerda = "Dia " + (hoje + 1) + " de " + a.ciclo;
+        String direita;
+        if (hoje < a.trabalho) {
+            int resta = a.trabalho - 1 - hoje;
+            direita = resta == 0 ? "Último dia de trabalho" : "Trabalha mais " + resta + (resta == 1 ? " dia" : " dias");
+        } else {
+            int volta = a.ciclo - hoje;
+            direita = "Folga: volta em " + volta + (volta == 1 ? " dia" : " dias");
+        }
+        LinearLayout legenda = new LinearLayout(this);
+        legenda.addView(Ui.texto(this, esquerda, 13, false, Ui.cor(this, R.color.mute)),
+                new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        legenda.addView(Ui.texto(this, direita, 13, false, Ui.cor(this, R.color.mute)));
+        col.addView(legenda, Ui.largura(this, 6));
+        return col;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        atualizar();
+    }
+
+    // ---------- avisos ----------
+
+    private void montarAvisos() {
+        avisos.removeAllViews();
+        String pkg = "package:" + getPackageName();
+
+        if (novaVersao != null) {
+            aviso("Tem uma versão nova do app (" + novaVersao.versao + ").",
+                    "Atualizar agora", this::iniciarAtualizacao, true);
+        }
+
+        if (Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            aviso("Sem permissão de notificação, o alarme pode não aparecer na tela.",
+                    "Permitir notificações", () -> {
+                        if (shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) {
+                            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, PEDIR_NOTIF);
+                        } else {
+                            abrir(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                    .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName()));
+                        }
+                    }, false);
+        }
+
+        if (!Agendador.podeAgendar(this) && Build.VERSION.SDK_INT >= 31) {
+            aviso("O app precisa de permissão para \"Alarmes e lembretes\". Sem ela o alarme NÃO toca.",
+                    "Dar permissão", () -> abrir(new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                            Uri.parse(pkg))), false);
+        }
+
+        if (Build.VERSION.SDK_INT >= 34) {
+            NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            if (!nm.canUseFullScreenIntent()) {
+                aviso("Permita \"notificações em tela cheia\" para o alarme aparecer com o celular bloqueado.",
+                        "Permitir tela cheia", () -> abrir(new Intent(
+                                Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse(pkg))), false);
+            }
+        }
+
+        PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        if (!pm.isIgnoringBatteryOptimizations(getPackageName())) {
+            aviso("Recomendado: tirar o app da economia de bateria, para o celular não bloquear o alarme.",
+                    "Liberar bateria", () -> abrir(new Intent(
+                            Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse(pkg))), false);
+        }
+    }
+
+    private void aviso(String texto, String botao, Runnable acao, boolean novidade) {
+        LinearLayout caixa = new LinearLayout(this);
+        caixa.setOrientation(LinearLayout.VERTICAL);
+        int p = Ui.dp(this, 14);
+        caixa.setPadding(p, p, p, p);
+        caixa.setBackground(Ui.forma(this,
+                Ui.cor(this, novidade ? R.color.ciclo_soft : R.color.mensal_soft), 0, 16, 0));
+
+        caixa.addView(Ui.texto(this, texto, 15, false, Ui.cor(this, R.color.ink)), Ui.largura());
+
+        Button b = Ui.botao(this, botao, novidade ? Ui.PRIMARIO : Ui.CONTORNO);
+        b.setOnClickListener(v -> acao.run());
+        caixa.addView(b, Ui.largura(this, 10));
+
+        LinearLayout.LayoutParams lp = Ui.largura();
+        lp.bottomMargin = Ui.dp(this, 10);
+        avisos.addView(caixa, lp);
+    }
+
+    private void abrir(Intent i) {
+        try {
+            startActivity(i);
+        } catch (Exception e) {
+            try {
+                startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:" + getPackageName())));
+            } catch (Exception ignored) { }
+        }
+    }
+}
+@@@FILE app/src/main/java/com/escala/alarme/EditarActivity.java
+package com.escala.alarme;
+
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.app.DatePickerDialog;
+import android.app.TimePickerDialog;
+import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
+import android.os.Bundle;
+import android.text.InputType;
+import android.util.TypedValue;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.ImageButton;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.Switch;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.Locale;
+
+/** Tela para criar ou editar um alarme. */
+public class EditarActivity extends Activity {
+
+    private static final Locale BR = Locale.forLanguageTag("pt-BR");
+
+    private Escala escala;
+    private Alarme a;
+    private boolean novo;
+
+    private EditText edNome;
+    private Ui.Passo pCiclo, pTrabalho, pDia;
+    private Button btnCiclo, btnMensal, btnInicio, btnHoraMensal;
+    private LinearLayout boxCiclo, boxMensal, boxHorarios;
+
+    private LocalDate dataInicio;
+    private int minutosMensal;
+    private int[] hs = new int[0];
+    private boolean[] lig = new boolean[0];
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        escala = new Escala(this);
+        long id = getIntent().getLongExtra("id", 0L);
+        Alarme existente = id != 0L ? escala.buscar(id) : null;
+        novo = existente == null;
+        a = novo ? Alarme.novo() : existente;
+        construirTela();
+        preencher();
+    }
+
+    // ---------- montagem da tela ----------
+
+    private void construirTela() {
+        LinearLayout raiz = new LinearLayout(this);
+        raiz.setOrientation(LinearLayout.VERTICAL);
+        int pad = Ui.dp(this, 16);
+        raiz.setPadding(pad, pad, pad, Ui.dp(this, 32));
+
+        ScrollView sv = new ScrollView(this);
+        sv.setFitsSystemWindows(true);
+        sv.addView(raiz);
+        setContentView(sv);
+
+        // cabeçalho
+        LinearLayout topo = new LinearLayout(this);
+        topo.setGravity(Gravity.CENTER_VERTICAL);
+        ImageButton voltar = new ImageButton(this);
+        Drawable seta = getDrawable(R.drawable.ic_voltar).mutate();
+        seta.setTint(Ui.cor(this, R.color.ink));
+        voltar.setImageDrawable(seta);
+        voltar.setContentDescription("Voltar");
+        voltar.setBackground(Ui.ondulado(Ui.forma(this, Ui.cor(this, R.color.card),
+                Ui.cor(this, R.color.line), 14, 2)));
+        voltar.setOnClickListener(v -> finish());
+        topo.addView(voltar, new LinearLayout.LayoutParams(Ui.dp(this, 52), Ui.dp(this, 52)));
+        TextView titulo = Ui.texto(this, novo ? "Novo alarme" : "Editar alarme", 24, true,
+                Ui.cor(this, R.color.ink));
+        titulo.setPadding(Ui.dp(this, 14), 0, 0, 0);
+        topo.addView(titulo);
+        raiz.addView(topo, Ui.largura());
+
+        // nome
+        raiz.addView(rotulo("Nome"), Ui.largura(this, 20));
+        edNome = new EditText(this);
+        edNome.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        edNome.setSingleLine(true);
+        edNome.setHint("Ex.: Trabalho, Aluguel");
+        edNome.setHintTextColor(Ui.cor(this, R.color.mute));
+        edNome.setTextColor(Ui.cor(this, R.color.ink));
+        edNome.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+        edNome.setMinHeight(Ui.dp(this, 56));
+        edNome.setPadding(Ui.dp(this, 14), 0, Ui.dp(this, 14), 0);
+        edNome.setBackground(Ui.forma(this, Ui.cor(this, R.color.card),
+                Ui.cor(this, R.color.line), 14, 2));
+        raiz.addView(edNome, Ui.largura(this, 6));
+
+        // tipo
+        raiz.addView(rotulo("Como repete"), Ui.largura(this, 20));
+        LinearLayout tipos = new LinearLayout(this);
+        btnCiclo = botaoTipo("Ciclo de dias", R.drawable.ic_ciclo);
+        btnMensal = botaoTipo("Todo mês", R.drawable.ic_calendario);
+        btnCiclo.setOnClickListener(v -> escolherTipo(Alarme.CICLO));
+        btnMensal.setOnClickListener(v -> escolherTipo(Alarme.MENSAL));
+        LinearLayout.LayoutParams l1 = new LinearLayout.LayoutParams(0, Ui.dp(this, 64), 1f);
+        l1.rightMargin = Ui.dp(this, 4);
+        LinearLayout.LayoutParams l2 = new LinearLayout.LayoutParams(0, Ui.dp(this, 64), 1f);
+        l2.leftMargin = Ui.dp(this, 4);
+        tipos.addView(btnCiclo, l1);
+        tipos.addView(btnMensal, l2);
+        raiz.addView(tipos, Ui.largura(this, 6));
+
+        // --- opções do ciclo ---
+        boxCiclo = new LinearLayout(this);
+        boxCiclo.setOrientation(LinearLayout.VERTICAL);
+        boxCiclo.addView(rotulo("Duração do ciclo (dias)"), Ui.largura(this, 20));
+        pCiclo = new Ui.Passo(this, 2, 365, v -> {
+            pTrabalho.max = Math.min(31, v);
+            if (pTrabalho.valor(1) > pTrabalho.max) pTrabalho.definir(pTrabalho.max);
+        });
+        boxCiclo.addView(pCiclo, Ui.largura(this, 6));
+        boxCiclo.addView(rotulo("Dias de trabalho no começo do ciclo"), Ui.largura(this, 20));
+        pTrabalho = new Ui.Passo(this, 1, 31, v -> {
+            ajustarDias(v);
+            montarHorarios();
+        });
+        boxCiclo.addView(pTrabalho, Ui.largura(this, 6));
+        boxCiclo.addView(rotulo("1º dia de trabalho de um ciclo"), Ui.largura(this, 20));
+        btnInicio = Ui.botao(this, "", Ui.CONTORNO);
+        btnInicio.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        btnInicio.setPadding(Ui.dp(this, 14), 0, Ui.dp(this, 14), 0);
+        btnInicio.setOnClickListener(v -> escolherInicio());
+        boxCiclo.addView(btnInicio, Ui.largura(this, 6));
+        boxCiclo.addView(rotulo("Horário de cada dia"), Ui.largura(this, 20));
+        boxHorarios = new LinearLayout(this);
+        boxHorarios.setOrientation(LinearLayout.VERTICAL);
+        boxHorarios.setPadding(Ui.dp(this, 14), Ui.dp(this, 4), Ui.dp(this, 14), Ui.dp(this, 4));
+        boxHorarios.setBackground(Ui.forma(this, Ui.cor(this, R.color.card),
+                Ui.cor(this, R.color.line), 20, 2));
+        boxCiclo.addView(boxHorarios, Ui.largura(this, 6));
+        raiz.addView(boxCiclo, Ui.largura());
+
+        // --- opções mensais ---
+        boxMensal = new LinearLayout(this);
+        boxMensal.setOrientation(LinearLayout.VERTICAL);
+        boxMensal.addView(rotulo("Dia do mês (1 a 31)"), Ui.largura(this, 20));
+        pDia = new Ui.Passo(this, 1, 31, v -> { });
+        boxMensal.addView(pDia, Ui.largura(this, 6));
+        boxMensal.addView(Ui.texto(this,
+                "Se o mês não tiver esse dia (ex.: 31 em abril), toca no último dia do mês.",
+                14, false, Ui.cor(this, R.color.mute)), Ui.largura(this, 8));
+        boxMensal.addView(rotulo("Horário"), Ui.largura(this, 20));
+        btnHoraMensal = Ui.botao(this, "", Ui.CONTORNO);
+        btnHoraMensal.setTextSize(TypedValue.COMPLEX_UNIT_SP, 28);
+        btnHoraMensal.setMinHeight(Ui.dp(this, 64));
+        btnHoraMensal.setOnClickListener(v -> new TimePickerDialog(this, (tp, h, m) -> {
+            minutosMensal = h * 60 + m;
+            btnHoraMensal.setText(Alarme.hhmm(minutosMensal));
+        }, minutosMensal / 60, minutosMensal % 60, true).show());
+        boxMensal.addView(btnHoraMensal, Ui.largura(this, 6));
+        raiz.addView(boxMensal, Ui.largura());
+
+        // --- botões ---
+        Button salvar = Ui.botao(this, "Salvar", Ui.PRIMARIO);
+        salvar.setOnClickListener(v -> salvar());
+        raiz.addView(salvar, Ui.largura(this, 28));
+
+        if (!novo) {
+            Button excluir = Ui.botao(this, "Excluir alarme", Ui.PERIGO);
+            excluir.setOnClickListener(v -> new AlertDialog.Builder(this)
+                    .setMessage("Excluir o alarme \"" + a.nome + "\"?")
+                    .setPositiveButton("Excluir", (d, w) -> {
+                        escala.remover(a.id);
+                        Agendador.agendar(this);
+                        finish();
+                    })
+                    .setNegativeButton("Cancelar", null)
+                    .show());
+            raiz.addView(excluir, Ui.largura(this, 8));
+        }
+
+        Button cancelar = Ui.botao(this, "Cancelar", Ui.CONTORNO);
+        cancelar.setOnClickListener(v -> finish());
+        raiz.addView(cancelar, Ui.largura(this, 8));
+    }
+
+    private Button botaoTipo(String texto, int icone) {
+        Button b = Ui.botao(this, texto, Ui.CONTORNO);
+        Drawable d = getDrawable(icone).mutate();
+        d.setTint(Ui.cor(this, R.color.ink));
+        int s = Ui.dp(this, 22);
+        d.setBounds(0, 0, s, s);
+        b.setCompoundDrawables(d, null, null, null);
+        b.setCompoundDrawablePadding(Ui.dp(this, 8));
+        b.setPadding(Ui.dp(this, 8), 0, Ui.dp(this, 8), 0);
+        return b;
+    }
+
+    private void escolherTipo(int tipo) {
+        a.tipo = tipo;
+        mostrarTipo();
+    }
+
+    private void mostrarTipo() {
+        boolean mensal = a.tipo == Alarme.MENSAL;
+        boxCiclo.setVisibility(mensal ? View.GONE : View.VISIBLE);
+        boxMensal.setVisibility(mensal ? View.VISIBLE : View.GONE);
+        marcar(btnCiclo, !mensal);
+        marcar(btnMensal, mensal);
+    }
+
+    private void marcar(Button b, boolean ligado) {
+        int borda = Ui.cor(this, ligado ? R.color.primary : R.color.line);
+        b.setBackground(Ui.ondulado(Ui.forma(this, Ui.cor(this, R.color.card), borda, 16,
+                ligado ? 3 : 2)));
+    }
+
+    private void preencher() {
+        edNome.setText(novo ? "" : a.nome);
+
+        hs = new int[a.trabalho];
+        lig = new boolean[a.trabalho];
+        for (int i = 0; i < a.trabalho; i++) {
+            int m = a.horarioDoDia(i);
+            lig[i] = m >= 0;
+            hs[i] = m >= 0 ? m : 360;
+        }
+        pCiclo.definir(a.ciclo);
+        pTrabalho.definir(a.trabalho);
+
+        dataInicio = LocalDate.ofEpochDay(a.inicio);
+        atualizarTextoInicio();
+
+        pDia.definir(a.diaMes);
+        minutosMensal = a.minutos;
+        btnHoraMensal.setText(Alarme.hhmm(minutosMensal));
+
+        montarHorarios();
+        mostrarTipo();
+    }
+
+    // ---------- horários do ciclo ----------
+
+    private void ajustarDias(int n) {
+        int[] nh = new int[n];
+        boolean[] nl = new boolean[n];
+        for (int i = 0; i < n; i++) {
+            if (i < hs.length) {
+                nh[i] = hs[i];
+                nl[i] = lig[i];
+            } else {
+                nh[i] = hs.length > 0 ? hs[hs.length - 1] : 360;
+                nl[i] = true;
+            }
+        }
+        hs = nh;
+        lig = nl;
+    }
+
+    private void montarHorarios() {
+        if (boxHorarios == null || dataInicio == null) return;
+        boxHorarios.removeAllViews();
+        for (int i = 0; i < hs.length; i++) {
+            final int dia = i;
+            LinearLayout linha = new LinearLayout(this);
+            linha.setGravity(Gravity.CENTER_VERTICAL);
+            linha.setPadding(0, Ui.dp(this, 8), 0, Ui.dp(this, 8));
+
+            LinearLayout nomes = new LinearLayout(this);
+            nomes.setOrientation(LinearLayout.VERTICAL);
+            nomes.addView(Ui.texto(this, "Dia " + (i + 1), 16, true, Ui.cor(this, R.color.ink)));
+            nomes.addView(Ui.texto(this,
+                    dataInicio.plusDays(i).format(DateTimeFormatter.ofPattern("EEE, dd/MM", BR)),
+                    13, false, Ui.cor(this, R.color.mute)));
+            linha.addView(nomes, new LinearLayout.LayoutParams(0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+            Button hora = Ui.botao(this, Alarme.hhmm(hs[i]), Ui.CONTORNO);
+            hora.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
+            hora.setMinHeight(Ui.dp(this, 48));
+            hora.setMinimumHeight(Ui.dp(this, 48));
+            hora.setMinWidth(Ui.dp(this, 96));
+            hora.setMinimumWidth(Ui.dp(this, 96));
+            hora.setEnabled(lig[i]);
+            hora.setAlpha(lig[i] ? 1f : 0.45f);
+            hora.setOnClickListener(v -> new TimePickerDialog(this, (tp, h, m) -> {
+                hs[dia] = h * 60 + m;
+                montarHorarios();
+            }, hs[dia] / 60, hs[dia] % 60, true).show());
+            linha.addView(hora);
+
+            Switch sw = Ui.interruptor(this, lig[i], (b, marcado) -> {
+                lig[dia] = marcado;
+                hora.setEnabled(marcado);
+                hora.setAlpha(marcado ? 1f : 0.45f);
+            });
+            LinearLayout.LayoutParams lps = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lps.leftMargin = Ui.dp(this, 14);
+            lps.rightMargin = Ui.dp(this, 6);
+            linha.addView(sw, lps);
+
+            boxHorarios.addView(linha, Ui.largura());
+        }
+    }
+
+    private void escolherInicio() {
+        new DatePickerDialog(this, (dp, ano, mes, dia) -> {
+            dataInicio = LocalDate.of(ano, mes + 1, dia);
+            atualizarTextoInicio();
+            montarHorarios();
+        }, dataInicio.getYear(), dataInicio.getMonthValue() - 1, dataInicio.getDayOfMonth()).show();
+    }
+
+    private void atualizarTextoInicio() {
+        btnInicio.setText(dataInicio.format(DateTimeFormatter.ofPattern("EEEE, dd/MM/yyyy", BR)));
+    }
+
+    // ---------- salvar ----------
+
+    private void salvar() {
+        String nome = edNome.getText().toString().trim();
+        if (nome.isEmpty()) nome = "Alarme";
+
+        if (a.tipo == Alarme.CICLO) {
+            int ciclo = pCiclo.valor(-1);
+            int trab = pTrabalho.valor(-1);
+            if (ciclo < 2 || ciclo > 365) {
+                erro("A duração do ciclo deve ficar entre 2 e 365 dias.");
+                return;
+            }
+            if (trab < 1 || trab > ciclo || trab > 31) {
+                erro("Os dias de trabalho devem ficar entre 1 e a duração do ciclo (no máximo 31).");
+                return;
+            }
+            ajustarDias(trab);
+            a.ciclo = ciclo;
+            a.trabalho = trab;
+            a.inicio = dataInicio.toEpochDay();
+            a.horarios = new int[trab];
+            for (int i = 0; i < trab; i++) a.horarios[i] = lig[i] ? hs[i] : -1;
+        } else {
+            int dia = pDia.valor(-1);
+            if (dia < 1 || dia > 31) {
+                erro("O dia do mês deve ficar entre 1 e 31.");
+                return;
+            }
+            a.diaMes = dia;
+            a.minutos = minutosMensal;
+        }
+        a.nome = nome;
+        escala.salvarUm(a);
+        Agendador.agendar(this);
+        finish();
+    }
+
+    private void erro(String msg) {
+        Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+    }
+
+    private TextView rotulo(String texto) {
+        return Ui.texto(this, texto, 16, true, Ui.cor(this, R.color.ink));
+    }
+}
+@@@FILE app/src/main/java/com/escala/alarme/ConfigActivity.java
+package com.escala.alarme;
+
+import android.app.Activity;
+import android.content.Intent;
+import android.graphics.drawable.Drawable;
+import android.media.Ringtone;
+import android.media.RingtoneManager;
+import android.net.Uri;
+import android.os.Bundle;
+import android.provider.Settings;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.Button;
+import android.widget.ImageButton;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import android.widget.Toast;
+
+/** Tela de configurações: som, notificação de contagem e teste do alarme. */
+public class ConfigActivity extends Activity {
+
+    private static final int ESCOLHER_SOM = 2;
+
+    private Escala escala;
+    private TextView subSom;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        escala = new Escala(this);
+
+        LinearLayout raiz = new LinearLayout(this);
+        raiz.setOrientation(LinearLayout.VERTICAL);
+        int pad = Ui.dp(this, 16);
+        raiz.setPadding(pad, pad, pad, Ui.dp(this, 32));
+
+        ScrollView sv = new ScrollView(this);
+        sv.setFitsSystemWindows(true);
+        sv.addView(raiz);
+        setContentView(sv);
+
+        LinearLayout topo = new LinearLayout(this);
+        topo.setGravity(Gravity.CENTER_VERTICAL);
+        ImageButton voltar = new ImageButton(this);
+        Drawable seta = getDrawable(R.drawable.ic_voltar).mutate();
+        seta.setTint(Ui.cor(this, R.color.ink));
+        voltar.setImageDrawable(seta);
+        voltar.setContentDescription("Voltar");
+        voltar.setBackground(Ui.ondulado(Ui.forma(this, Ui.cor(this, R.color.card),
+                Ui.cor(this, R.color.line), 14, 2)));
+        voltar.setOnClickListener(v -> finish());
+        topo.addView(voltar, new LinearLayout.LayoutParams(Ui.dp(this, 52), Ui.dp(this, 52)));
+        TextView titulo = Ui.texto(this, "Configurações", 24, true, Ui.cor(this, R.color.ink));
+        titulo.setPadding(Ui.dp(this, 14), 0, 0, 0);
+        topo.addView(titulo);
+        raiz.addView(topo, Ui.largura());
+
+        raiz.addView(rotulo("Alarme"), Ui.largura(this, 24));
+        LinearLayout som = linha("Som", "");
+        subSom = (TextView) ((LinearLayout) som.getChildAt(0)).getChildAt(1);
+        Button trocar = Ui.botao(this, "Trocar", Ui.CONTORNO);
+        trocar.setMinHeight(Ui.dp(this, 48));
+        trocar.setMinimumHeight(Ui.dp(this, 48));
+        trocar.setMinWidth(0);
+        trocar.setMinimumWidth(0);
+        trocar.setOnClickListener(v -> escolherSom());
+        som.addView(trocar);
+        raiz.addView(caixa(som), Ui.largura(this, 6));
+
+        raiz.addView(rotulo("Notificação"), Ui.largura(this, 24));
+        LinearLayout notif = linha("Mostrar próximos alarmes", "Fica visível também na tela de bloqueio");
+        notif.addView(Ui.interruptor(this, escala.mostrarContagem(), (b, v) -> {
+            escala.setMostrarContagem(v);
+            Contagem.atualizar(this);
+        }));
+        raiz.addView(caixa(notif), Ui.largura(this, 6));
+
+        raiz.addView(rotulo("Teste"), Ui.largura(this, 24));
+        Button testar = Ui.botao(this, "Testar alarme (toca em 10 segundos)", Ui.CONTORNO);
+        testar.setOnClickListener(v -> {
+            Agendador.agendarAvulso(this, Agendador.REQ_TESTE, 10_000L, "Teste");
+            Toast.makeText(this, "Pode bloquear a tela. O alarme toca em 10 segundos.",
+                    Toast.LENGTH_LONG).show();
+        });
+        raiz.addView(testar, Ui.largura(this, 6));
+
+        raiz.addView(rotulo("Sobre"), Ui.largura(this, 24));
+        raiz.addView(caixa(linha("Alarme da Escala",
+                "Versão " + Atualizador.versaoInstalada(this))), Ui.largura(this, 6));
+
+        atualizarSom();
+    }
+
+    private TextView rotulo(String t) {
+        return Ui.texto(this, t, 16, true, Ui.cor(this, R.color.ink));
+    }
+
+    /** Linha com título e subtítulo à esquerda; o que vier depois é adicionado à direita. */
+    private LinearLayout linha(String titulo, String sub) {
+        LinearLayout l = new LinearLayout(this);
+        l.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout textos = new LinearLayout(this);
+        textos.setOrientation(LinearLayout.VERTICAL);
+        textos.addView(Ui.texto(this, titulo, 17, true, Ui.cor(this, R.color.ink)));
+        TextView s = Ui.texto(this, sub, 14, false, Ui.cor(this, R.color.mute));
+        if (sub.isEmpty()) s.setVisibility(View.VISIBLE);
+        textos.addView(s);
+        l.addView(textos, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        return l;
+    }
+
+    private LinearLayout caixa(LinearLayout conteudo) {
+        LinearLayout c = new LinearLayout(this);
+        int p = Ui.dp(this, 14);
+        c.setPadding(p, p, p, p);
+        c.setBackground(Ui.forma(this, Ui.cor(this, R.color.card), Ui.cor(this, R.color.line), 20, 2));
+        c.addView(conteudo, Ui.largura());
+        return c;
+    }
+
+    private void escolherSom() {
+        Intent i = new Intent(RingtoneManager.ACTION_RINGTONE_PICKER);
+        i.putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM);
+        i.putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Som do alarme");
+        i.putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false);
+        i.putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true);
+        String atual = escala.toque();
+        i.putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
+                atual != null ? Uri.parse(atual) : Settings.System.DEFAULT_ALARM_ALERT_URI);
+        try {
+            startActivityForResult(i, ESCOLHER_SOM);
+        } catch (Exception e) {
+            Toast.makeText(this, "Não foi possível abrir a lista de sons.", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == ESCOLHER_SOM && resultCode == RESULT_OK && data != null) {
+            Uri u = data.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI);
+            boolean padrao = u == null || u.equals(Settings.System.DEFAULT_ALARM_ALERT_URI);
+            escala.setToque(padrao ? null : u.toString());
+            atualizarSom();
+        }
+    }
+
+    private void atualizarSom() {
+        subSom.setText(nomeDoSom());
+    }
+
+    private String nomeDoSom() {
+        String t = escala.toque();
+        if (t == null) return "Padrão do celular";
+        try {
+            Ringtone r = RingtoneManager.getRingtone(this, Uri.parse(t));
+            if (r != null) return r.getTitle(this);
+        } catch (Exception ignored) { }
+        return "Personalizado";
+    }
+}

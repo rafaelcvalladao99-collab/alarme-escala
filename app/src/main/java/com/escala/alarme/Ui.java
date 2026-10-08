@@ -14,6 +14,7 @@ import android.view.Gravity;
 import android.widget.Button;
 import android.widget.CompoundButton;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.Switch;
 import android.widget.TextView;
@@ -110,6 +111,65 @@ final class Ui {
         s.setScaleY(1.2f);
         s.setOnCheckedChangeListener(l);
         return s;
+    }
+
+    static final String[] SEMANA = {"seg", "ter", "qua", "qui", "sex", "sáb", "dom"};
+
+    private static Typeface preto() {
+        return Typeface.create("sans-serif-black", Typeface.NORMAL);
+    }
+
+    /**
+     * Um quadradinho de dia: número dentro, dia da semana embaixo e uma etiqueta de turno (HA/ZH) no canto.
+     * Sábado e domingo ficam em negrito forte.
+     */
+    static LinearLayout celula(Context c, String num, String sem, boolean cheio, boolean hoje,
+                               boolean fds, boolean tracejado, String turno, int altDp) {
+        int ink = cor(c, R.color.ink);
+        int mute = cor(c, R.color.mute);
+        LinearLayout col = new LinearLayout(c);
+        col.setOrientation(LinearLayout.VERTICAL);
+        FrameLayout f = new FrameLayout(c);
+
+        TextView t = texto(c, num, 12, true, cheio ? cor(c, R.color.on_primary) : (fds ? ink : mute));
+        t.setGravity(Gravity.CENTER);
+        if (fds) t.setTypeface(preto());
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(cheio ? cor(c, R.color.ciclo) : 0);
+        g.setCornerRadius(dp(c, 8));
+        if (tracejado && !hoje) {
+            g.setStroke(dp(c, 2), mute, dp(c, 4), dp(c, 3));
+        } else {
+            g.setStroke(dp(c, hoje ? 3 : 2), hoje ? ink : cor(c, cheio ? R.color.ciclo : R.color.line));
+        }
+        t.setBackground(g);
+        FrameLayout.LayoutParams lt = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, dp(c, altDp));
+        lt.topMargin = dp(c, 7);
+        f.addView(t, lt);
+
+        if (turno != null) {
+            TextView b = texto(c, turno, 9, true, cor(c, R.color.bg));
+            b.setBackground(forma(c, ink, 0, 6, 0));
+            b.setPadding(dp(c, 3), 0, dp(c, 3), 0);
+            FrameLayout.LayoutParams lb = new FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+            lb.gravity = Gravity.TOP | Gravity.END;
+            f.addView(b, lb);
+        }
+        col.addView(f, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        TextView s = texto(c, sem, 10, fds || hoje, (fds || hoje) ? ink : mute);
+        if (fds) s.setTypeface(preto());
+        s.setGravity(Gravity.CENTER);
+        col.addView(s, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        return col;
+    }
+
+    static String nomeTurno(int t) {
+        return t == Alarme.HA ? "HA" : t == Alarme.ZH ? "ZH" : null;
     }
 
     interface Mudou {

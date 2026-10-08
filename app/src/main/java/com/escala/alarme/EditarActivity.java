@@ -36,12 +36,15 @@ public class EditarActivity extends Activity {
     private EditText edNome;
     private Ui.Passo pCiclo, pTrabalho, pDia;
     private Button btnCiclo, btnMensal, btnInicio, btnHoraMensal;
-    private LinearLayout boxCiclo, boxMensal, boxHorarios;
+    private LinearLayout boxCiclo, boxMensal, boxHorarios, boxCal;
+    private Button btnHA, btnZH;
 
     private LocalDate dataInicio;
     private int minutosMensal;
+    private int minHA, minZH;
     private int[] hs = new int[0];
     private boolean[] lig = new boolean[0];
+    private int[] tn = new int[0];
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -123,6 +126,7 @@ public class EditarActivity extends Activity {
         pCiclo = new Ui.Passo(this, 2, 365, v -> {
             pTrabalho.max = Math.min(31, v);
             if (pTrabalho.valor(1) > pTrabalho.max) pTrabalho.definir(pTrabalho.max);
+            montarCalendario();
         });
         boxCiclo.addView(pCiclo, Ui.largura(this, 6));
         boxCiclo.addView(rotulo("Dias de trabalho no começo do ciclo"), Ui.largura(this, 20));
@@ -137,6 +141,32 @@ public class EditarActivity extends Activity {
         btnInicio.setPadding(Ui.dp(this, 14), 0, Ui.dp(this, 14), 0);
         btnInicio.setOnClickListener(v -> escolherInicio());
         boxCiclo.addView(btnInicio, Ui.largura(this, 6));
+        boxCiclo.addView(rotulo("Turnos"), Ui.largura(this, 20));
+        LinearLayout boxTurnos = new LinearLayout(this);
+        boxTurnos.setOrientation(LinearLayout.VERTICAL);
+        boxTurnos.setPadding(Ui.dp(this, 14), Ui.dp(this, 6), Ui.dp(this, 14), Ui.dp(this, 6));
+        boxTurnos.setBackground(Ui.forma(this, Ui.cor(this, R.color.card),
+                Ui.cor(this, R.color.line), 20, 2));
+        btnHA = botaoHora();
+        btnZH = botaoHora();
+        btnHA.setOnClickListener(v -> new TimePickerDialog(this, (tp, h, m) -> {
+            minHA = h * 60 + m;
+            btnHA.setText(Alarme.hhmm(minHA));
+        }, minHA / 60, minHA % 60, true).show());
+        btnZH.setOnClickListener(v -> new TimePickerDialog(this, (tp, h, m) -> {
+            minZH = h * 60 + m;
+            btnZH.setText(Alarme.hhmm(minZH));
+        }, minZH / 60, minZH % 60, true).show());
+        boxTurnos.addView(linhaTurno("HA", btnHA), Ui.largura());
+        boxTurnos.addView(linhaTurno("ZH", btnZH), Ui.largura());
+        boxCiclo.addView(boxTurnos, Ui.largura(this, 6));
+        boxCiclo.addView(rotulo("Calendário dos próximos ciclos"), Ui.largura(this, 20));
+        boxCal = new LinearLayout(this);
+        boxCal.setOrientation(LinearLayout.VERTICAL);
+        boxCiclo.addView(boxCal, Ui.largura(this, 2));
+        boxCiclo.addView(Ui.texto(this,
+                "Toque num dia para ligar ou desligar o alarme só dele. Ao ligar um dia fora da escala, você escolhe HA ou ZH.",
+                14, false, Ui.cor(this, R.color.mute)), Ui.largura(this, 8));
         boxCiclo.addView(rotulo("Horário de cada dia"), Ui.largura(this, 20));
         boxHorarios = new LinearLayout(this);
         boxHorarios.setOrientation(LinearLayout.VERTICAL);
@@ -190,6 +220,29 @@ public class EditarActivity extends Activity {
         raiz.addView(cancelar, Ui.largura(this, 8));
     }
 
+    private Button botaoHora() {
+        Button b = Ui.botao(this, "", Ui.CONTORNO);
+        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
+        b.setMinHeight(Ui.dp(this, 48));
+        b.setMinimumHeight(Ui.dp(this, 48));
+        b.setMinWidth(Ui.dp(this, 96));
+        b.setMinimumWidth(Ui.dp(this, 96));
+        return b;
+    }
+
+    private LinearLayout linhaTurno(String nome, Button hora) {
+        LinearLayout l = new LinearLayout(this);
+        l.setGravity(Gravity.CENTER_VERTICAL);
+        l.setPadding(0, Ui.dp(this, 8), 0, Ui.dp(this, 8));
+        LinearLayout nomes = new LinearLayout(this);
+        nomes.setOrientation(LinearLayout.VERTICAL);
+        nomes.addView(Ui.texto(this, nome, 17, true, Ui.cor(this, R.color.ink)));
+        nomes.addView(Ui.texto(this, "horário do alarme", 13, false, Ui.cor(this, R.color.mute)));
+        l.addView(nomes, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        l.addView(hora);
+        return l;
+    }
+
     private Button botaoTipo(String texto, int icone) {
         Button b = Ui.botao(this, texto, Ui.CONTORNO);
         Drawable d = getDrawable(icone).mutate();
@@ -226,11 +279,17 @@ public class EditarActivity extends Activity {
 
         hs = new int[a.trabalho];
         lig = new boolean[a.trabalho];
+        tn = new int[a.trabalho];
         for (int i = 0; i < a.trabalho; i++) {
             int m = a.horarioDoDia(i);
             lig[i] = m >= 0;
             hs[i] = m >= 0 ? m : 360;
+            tn[i] = a.turnoDoDia(i);
         }
+        minHA = a.ha;
+        minZH = a.zh;
+        btnHA.setText(Alarme.hhmm(minHA));
+        btnZH.setText(Alarme.hhmm(minZH));
         pCiclo.definir(a.ciclo);
         pTrabalho.definir(a.trabalho);
 
@@ -250,17 +309,21 @@ public class EditarActivity extends Activity {
     private void ajustarDias(int n) {
         int[] nh = new int[n];
         boolean[] nl = new boolean[n];
+        int[] nt = new int[n];
         for (int i = 0; i < n; i++) {
             if (i < hs.length) {
                 nh[i] = hs[i];
                 nl[i] = lig[i];
+                nt[i] = tn[i];
             } else {
                 nh[i] = hs.length > 0 ? hs[hs.length - 1] : 360;
                 nl[i] = true;
+                nt[i] = tn.length > 0 ? tn[tn.length - 1] : Alarme.HA;
             }
         }
         hs = nh;
         lig = nl;
+        tn = nt;
     }
 
     private void montarHorarios() {
@@ -281,12 +344,31 @@ public class EditarActivity extends Activity {
             linha.addView(nomes, new LinearLayout.LayoutParams(0,
                     LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
+            Button turno = Ui.botao(this, Ui.nomeTurno(tn[i]), Ui.CONTORNO);
+            turno.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+            turno.setMinHeight(Ui.dp(this, 48));
+            turno.setMinimumHeight(Ui.dp(this, 48));
+            turno.setMinWidth(Ui.dp(this, 52));
+            turno.setMinimumWidth(Ui.dp(this, 52));
+            turno.setPadding(Ui.dp(this, 6), 0, Ui.dp(this, 6), 0);
+            turno.setEnabled(lig[i]);
+            turno.setAlpha(lig[i] ? 1f : 0.45f);
+            turno.setOnClickListener(v -> {
+                tn[dia] = tn[dia] == Alarme.HA ? Alarme.ZH : Alarme.HA;
+                turno.setText(Ui.nomeTurno(tn[dia]));
+                montarCalendario();
+            });
+            LinearLayout.LayoutParams lpt = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lpt.rightMargin = Ui.dp(this, 6);
+            linha.addView(turno, lpt);
+
             Button hora = Ui.botao(this, Alarme.hhmm(hs[i]), Ui.CONTORNO);
             hora.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
             hora.setMinHeight(Ui.dp(this, 48));
             hora.setMinimumHeight(Ui.dp(this, 48));
-            hora.setMinWidth(Ui.dp(this, 96));
-            hora.setMinimumWidth(Ui.dp(this, 96));
+            hora.setMinWidth(Ui.dp(this, 80));
+            hora.setMinimumWidth(Ui.dp(this, 80));
             hora.setEnabled(lig[i]);
             hora.setAlpha(lig[i] ? 1f : 0.45f);
             hora.setOnClickListener(v -> new TimePickerDialog(this, (tp, h, m) -> {
@@ -299,15 +381,126 @@ public class EditarActivity extends Activity {
                 lig[dia] = marcado;
                 hora.setEnabled(marcado);
                 hora.setAlpha(marcado ? 1f : 0.45f);
+                turno.setEnabled(marcado);
+                turno.setAlpha(marcado ? 1f : 0.45f);
+                montarCalendario();
             });
             LinearLayout.LayoutParams lps = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            lps.leftMargin = Ui.dp(this, 14);
-            lps.rightMargin = Ui.dp(this, 6);
+            lps.leftMargin = Ui.dp(this, 8);
+            lps.rightMargin = Ui.dp(this, 4);
             linha.addView(sw, lps);
 
             boxHorarios.addView(linha, Ui.largura());
         }
+        montarCalendario();
+    }
+
+    // ---------- calendário dos próximos ciclos ----------
+
+    /** Passa o que está na tela para o alarme em edição (sem validar), para o calendário refletir. */
+    private void sincronizar() {
+        int ciclo = pCiclo.valor(a.ciclo);
+        int trab = pTrabalho.valor(a.trabalho);
+        if (ciclo < 2 || ciclo > 365 || trab < 1 || trab > ciclo || trab > 31) return;
+        if (hs.length != trab || dataInicio == null) return;
+        a.ciclo = ciclo;
+        a.trabalho = trab;
+        a.inicio = dataInicio.toEpochDay();
+        a.horarios = new int[trab];
+        a.turnos = new int[trab];
+        for (int i = 0; i < trab; i++) {
+            a.horarios[i] = lig[i] ? hs[i] : -1;
+            a.turnos[i] = tn[i];
+        }
+        a.ha = minHA;
+        a.zh = minZH;
+    }
+
+    private void montarCalendario() {
+        if (boxCal == null || dataInicio == null) return;
+        sincronizar();
+        boxCal.removeAllViews();
+        LocalDate hoje = LocalDate.now();
+        int ciclo = a.ciclo;
+        boolean porCiclo = ciclo <= 14;
+        int cols = porCiclo ? ciclo : 7;
+        int linhas = porCiclo ? 3 : 5;
+        LocalDate base = hoje.minusDays(a.posicao(hoje));
+        DateTimeFormatter dm = DateTimeFormatter.ofPattern("dd/MM", BR);
+        for (int r = 0; r < linhas; r++) {
+            LocalDate ini = base.plusDays((long) r * cols);
+            LocalDate fim = ini.plusDays(cols - 1);
+            String nome = porCiclo ? (r == 0 ? "Ciclo atual" : "Próximo ciclo") : "Semana";
+            boxCal.addView(Ui.texto(this, nome + " · " + ini.format(dm) + " a " + fim.format(dm),
+                    13, true, Ui.cor(this, R.color.mute)), Ui.largura(this, r == 0 ? 6 : 12));
+            LinearLayout fila = new LinearLayout(this);
+            for (int c = 0; c < cols; c++) {
+                final LocalDate d = ini.plusDays(c);
+                int turno = a.turnoEm(d);
+                Integer ex = a.exc.get(d.toEpochDay());
+                int sem = d.getDayOfWeek().getValue();
+                View cel = Ui.celula(this, String.valueOf(d.getDayOfMonth()), Ui.SEMANA[sem - 1],
+                        turno != Alarme.NADA, d.equals(hoje), sem >= 6,
+                        ex != null && ex == Alarme.NADA, Ui.nomeTurno(turno), 34);
+                cel.setOnClickListener(v -> tocarDia(d));
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0,
+                        LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+                lp.setMargins(Ui.dp(this, 1), 0, Ui.dp(this, 1), 0);
+                fila.addView(cel, lp);
+            }
+            boxCal.addView(fila, Ui.largura(this, 4));
+        }
+    }
+
+    private void tocarDia(LocalDate d) {
+        if (a.turnoEm(d) != Alarme.NADA) {
+            // desliga só esse dia
+            if (a.turnoNormal(d) == Alarme.NADA) a.exc.remove(d.toEpochDay());
+            else a.exc.put(d.toEpochDay(), Alarme.NADA);
+            montarCalendario();
+        } else {
+            perguntarTurno(d);
+        }
+    }
+
+    private void perguntarTurno(LocalDate d) {
+        LinearLayout c = new LinearLayout(this);
+        c.setOrientation(LinearLayout.VERTICAL);
+        c.setPadding(Ui.dp(this, 20), Ui.dp(this, 8), Ui.dp(this, 20), 0);
+        c.addView(Ui.texto(this, "Escolha o turno desse dia:", 16, false, Ui.cor(this, R.color.ink)));
+        LinearLayout fila = new LinearLayout(this);
+        final AlertDialog[] dlg = new AlertDialog[1];
+        fila.addView(botaoTurno("HA", Alarme.HA, a.ha, d, dlg), pesoUm(0, 6));
+        fila.addView(botaoTurno("ZH", Alarme.ZH, a.zh, d, dlg), pesoUm(6, 0));
+        c.addView(fila, Ui.largura(this, 12));
+        dlg[0] = new AlertDialog.Builder(this)
+                .setTitle("Trabalhar em " + d.format(DateTimeFormatter.ofPattern("dd/MM", BR)) + "?")
+                .setView(c)
+                .setNegativeButton("Cancelar", null)
+                .create();
+        dlg[0].show();
+    }
+
+    private LinearLayout.LayoutParams pesoUm(int esq, int dir) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        lp.leftMargin = Ui.dp(this, esq);
+        lp.rightMargin = Ui.dp(this, dir);
+        return lp;
+    }
+
+    private Button botaoTurno(String nome, int codigo, int minutos, LocalDate d, AlertDialog[] dlg) {
+        Button b = Ui.botao(this, nome + "\n" + Alarme.hhmm(minutos), Ui.CONTORNO);
+        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
+        b.setMinHeight(Ui.dp(this, 80));
+        b.setMinimumHeight(Ui.dp(this, 80));
+        b.setOnClickListener(v -> {
+            a.exc.put(d.toEpochDay(), codigo);
+            dlg[0].dismiss();
+            montarCalendario();
+        });
+        return b;
     }
 
     private void escolherInicio() {
@@ -344,7 +537,13 @@ public class EditarActivity extends Activity {
             a.trabalho = trab;
             a.inicio = dataInicio.toEpochDay();
             a.horarios = new int[trab];
-            for (int i = 0; i < trab; i++) a.horarios[i] = lig[i] ? hs[i] : -1;
+            a.turnos = new int[trab];
+            for (int i = 0; i < trab; i++) {
+                a.horarios[i] = lig[i] ? hs[i] : -1;
+                a.turnos[i] = tn[i];
+            }
+            a.ha = minHA;
+            a.zh = minZH;
         } else {
             int dia = pDia.valor(-1);
             if (dia < 1 || dia > 31) {

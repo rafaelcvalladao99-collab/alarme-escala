@@ -165,21 +165,11 @@ public class MainActivity extends Activity {
                 Ui.cor(this, R.color.line), 20, 2)));
         card.setAlpha(a.ativo ? 1f : 0.62f);
 
-        // linha de cima: tipo + interruptor
+        // linha de cima: nome + interruptor
         LinearLayout topo = new LinearLayout(this);
         topo.setGravity(Gravity.CENTER_VERTICAL);
-        TextView tag = Ui.texto(this, ciclo ? "Escala de trabalho" : "Todo mês", 13, true, corTipo);
-        Drawable icone = getDrawable(ciclo ? R.drawable.ic_ciclo : R.drawable.ic_calendario).mutate();
-        icone.setTint(corTipo);
-        int d16 = Ui.dp(this, 16);
-        icone.setBounds(0, 0, d16, d16);
-        tag.setCompoundDrawables(icone, null, null, null);
-        tag.setCompoundDrawablePadding(Ui.dp(this, 6));
-        tag.setBackground(Ui.forma(this, corSoft, 0, 999, 0));
-        tag.setPadding(Ui.dp(this, 10), Ui.dp(this, 4), Ui.dp(this, 12), Ui.dp(this, 4));
-        topo.addView(tag);
-        View espaco = new View(this);
-        topo.addView(espaco, new LinearLayout.LayoutParams(0, 1, 1f));
+        topo.addView(Ui.texto(this, a.nome, 20, true, ink),
+                new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         Switch sw = Ui.interruptor(this, a.ativo, (b, v) -> {
             a.ativo = v;
             escala.salvarUm(a);
@@ -187,8 +177,6 @@ public class MainActivity extends Activity {
         });
         topo.addView(sw);
         card.addView(topo, Ui.largura());
-
-        card.addView(Ui.texto(this, a.nome, 18, true, ink), Ui.largura(this, 8));
 
         LocalDateTime prox = a.proximo(LocalDateTime.now());
         TextView hora = Ui.texto(this, prox != null ? Alarme.hhmm(prox.getHour() * 60 + prox.getMinute()) : "—:—",
@@ -219,6 +207,21 @@ public class MainActivity extends Activity {
 
         if (ciclo) card.addView(faixa(a), Ui.largura(this, 12));
 
+        // rótulo do tipo, lá embaixo
+        TextView tag = Ui.texto(this, ciclo ? "Escala de trabalho" : "Todo mês", 13, true, corTipo);
+        Drawable icone = getDrawable(ciclo ? R.drawable.ic_ciclo : R.drawable.ic_calendario).mutate();
+        icone.setTint(corTipo);
+        int d16 = Ui.dp(this, 16);
+        icone.setBounds(0, 0, d16, d16);
+        tag.setCompoundDrawables(icone, null, null, null);
+        tag.setCompoundDrawablePadding(Ui.dp(this, 6));
+        tag.setBackground(Ui.forma(this, corSoft, 0, 999, 0));
+        tag.setPadding(Ui.dp(this, 10), Ui.dp(this, 4), Ui.dp(this, 12), Ui.dp(this, 4));
+        LinearLayout.LayoutParams ltag = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        ltag.topMargin = Ui.dp(this, 12);
+        card.addView(tag, ltag);
+
         card.setOnClickListener(v -> startActivity(
                 new Intent(this, EditarActivity.class).putExtra("id", a.id)));
 
@@ -236,18 +239,17 @@ public class MainActivity extends Activity {
 
         if (a.ciclo <= 14) {
             LinearLayout fila = new LinearLayout(this);
+            LocalDate inicioCiclo = LocalDate.now().minusDays(hoje);
             for (int i = 0; i < a.ciclo; i++) {
-                boolean trab = i < a.trabalho;
-                TextView t = Ui.texto(this, String.valueOf(i + 1), 12, true,
-                        Ui.cor(this, trab ? R.color.on_primary : R.color.mute));
-                t.setGravity(Gravity.CENTER);
-                int fundo = trab ? Ui.cor(this, R.color.ciclo) : 0;
-                int borda = i == hoje ? Ui.cor(this, R.color.ink)
-                        : Ui.cor(this, trab ? R.color.ciclo : R.color.line);
-                t.setBackground(Ui.forma(this, fundo, borda, 8, i == hoje ? 3 : 2));
-                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, Ui.dp(this, 30), 1f);
+                LocalDate dia = inicioCiclo.plusDays(i);
+                int turno = a.turnoEm(dia);
+                int sem = dia.getDayOfWeek().getValue();
+                View cel = Ui.celula(this, String.valueOf(i + 1), Ui.SEMANA[sem - 1], turno != Alarme.NADA,
+                        i == hoje, sem >= 6, false, Ui.nomeTurno(turno), 30);
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0,
+                        LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
                 lp.setMargins(Ui.dp(this, 2), 0, Ui.dp(this, 2), 0);
-                fila.addView(t, lp);
+                fila.addView(cel, lp);
             }
             col.addView(fila, Ui.largura());
         }

@@ -1,0 +1,1375 @@
+@@@FILE app/src/main/java/com/escala/alarme/Alarme.java
+package com.escala.alarme;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
+import java.util.Iterator;
+import java.util.Locale;
+import java.util.TreeMap;
+
+/**
+ * Um alarme com a sua regra de repetição.
+ * CICLO: ciclo de X dias; os primeiros dias são de trabalho (tocam) e o resto é folga.
+ * MENSAL: todo mês no mesmo dia (se o mês for mais curto, toca no último dia do mês).
+ */
+public class Alarme {
+
+    public static final int CICLO = 0;
+    public static final int MENSAL = 1;
+
+    /** Turnos de um dia: sem alarme, HA ou ZH (zero hora). */
+    public static final int NADA = 0;
+    public static final int HA = 1;
+    public static final int ZH = 2;
+
+    public long id;
+    public String nome = "Novo alarme";
+    public int tipo = CICLO;
+    public boolean ativo = true;
+
+    // CICLO
+    public int ciclo = 10;
+    public int trabalho = 4;
+    public long inicio = LocalDate.now().toEpochDay();
+    /** Minutos desde 00:00 para cada dia de trabalho; -1 = sem alarme naquele dia. */
+    public int[] horarios = {360, 360, 360, 360};
+    /** Horário dos turnos, em minutos desde 00:00. */
+    public int ha = 290;
+    public int zh = 1010;
+    /** Turno (HA ou ZH) de cada dia de trabalho; null = automático (primeira metade HA, resto ZH). */
+    public int[] turnos = null;
+    /** Exceções por data (dia em epoch day): NADA = não toca nesse dia; HA ou ZH = toca nesse turno. */
+    public TreeMap<Long, Integer> exc = new TreeMap<>();
+
+    // MENSAL
+    public int diaMes = 1;
+    public int minutos = 540;
+
+    public static Alarme novo() {
+        Alarme a = new Alarme();
+        a.id = System.currentTimeMillis();
+        return a;
+    }
+
+    public int horarioDoDia(int i) {
+        if (i >= 0 && i < horarios.length) return horarios[i];
+        return horarios.length > 0 ? horarios[horarios.length - 1] : 360;
+    }
+
+    public int turnoDoDia(int i) {
+        if (turnos != null && i >= 0 && i < turnos.length && (turnos[i] == HA || turnos[i] == ZH)) {
+            return turnos[i];
+        }
+        return i < (trabalho + 1) / 2 ? HA : ZH;
+    }
+
+    /** Turno do dia pela escala normal, sem contar as exceções. */
+    public int turnoNormal(LocalDate d) {
+        int pos = posicao(d);
+        if (pos < trabalho && horarioDoDia(pos) >= 0) return turnoDoDia(pos);
+        return NADA;
+    }
+
+    /** Turno do dia já contando as exceções. */
+    public int turnoEm(LocalDate d) {
+        Integer e = exc.get(d.toEpochDay());
+        return e != null ? e : turnoNormal(d);
+    }
+
+    /** Horário do alarme naquele dia, ou -1 se não toca. */
+    public int minutosEm(LocalDate d) {
+        Integer e = exc.get(d.toEpochDay());
+        if (e != null) return e == HA ? ha : e == ZH ? zh : -1;
+        int pos = posicao(d);
+        return pos < trabalho ? horarioDoDia(pos) : -1;
+    }
+
+    /** Posição da data dentro do ciclo: 0 até ciclo-1. */
+    public int posicao(LocalDate d) {
+        long n = ChronoUnit.DAYS.between(LocalDate.ofEpochDay(inicio), d);
+        return (int) Math.floorMod(n, (long) ciclo);
+    }
+
+    /** Próximo toque estritamente depois de "depois", ou null se não houver. */
+    public LocalDateTime proximo(LocalDateTime depois) {
+        if (!ativo) return null;
+        LocalDate hoje = depois.toLocalDate();
+        if (tipo == CICLO) {
+            if (ciclo < 1) return null;
+            for (int i = 0; i <= ciclo + 1; i++) {
+                LocalDate d = hoje.plusDays(i);
+                int m = minutosEm(d);
+                if (m >= 0) {
+                    LocalDateTime t = d.atTime(m / 60, m % 60);
+                    if (t.isAfter(depois)) return t;
+                }
+            }
+            return null;
+        }
+        for (int k = 0; k <= 13; k++) {
+            YearMonth ym = YearMonth.from(hoje).plusMonths(k);
+            int dia = Math.min(diaMes, ym.lengthOfMonth());
+            LocalDateTime t = ym.atDay(dia).atTime(minutos / 60, minutos % 60);
+            if (t.isAfter(depois)) return t;
+        }
+        return null;
+    }
+
+    public String resumo() {
+        if (tipo == MENSAL) {
+            return "Todo dia " + diaMes + " do mês, " + hhmm(minutos);
+        }
+        return "Ciclo de " + ciclo + " dias: " + trabalho + " de trabalho e "
+                + Math.max(0, ciclo - trabalho) + " de folga";
+    }
+
+    public static String hhmm(int m) {
+        return String.format(Locale.ROOT, "%02d:%02d", m / 60, m % 60);
+    }
+
+    public JSONObject toJson() throws JSONException {
+        JSONObject o = new JSONObject();
+        o.put("id", id);
+        o.put("nome", nome);
+        o.put("tipo", tipo);
+        o.put("ativo", ativo);
+        o.put("ciclo", ciclo);
+        o.put("trabalho", trabalho);
+        o.put("inicio", inicio);
+        JSONArray h = new JSONArray();
+        for (int m : horarios) h.put(m);
+        o.put("horarios", h);
+        o.put("ha", ha);
+        o.put("zh", zh);
+        if (turnos != null) {
+            JSONArray tn = new JSONArray();
+            for (int t : turnos) tn.put(t);
+            o.put("turnos", tn);
+        }
+        JSONObject ex = new JSONObject();
+        for (java.util.Map.Entry<Long, Integer> e : exc.entrySet()) ex.put(String.valueOf(e.getKey()), e.getValue());
+        o.put("exc", ex);
+        o.put("diaMes", diaMes);
+        o.put("minutos", minutos);
+        return o;
+    }
+
+    public static Alarme deJson(JSONObject o) throws JSONException {
+        Alarme a = new Alarme();
+        a.id = o.getLong("id");
+        a.nome = o.optString("nome", "Alarme");
+        a.tipo = o.optInt("tipo", CICLO);
+        a.ativo = o.optBoolean("ativo", true);
+        a.ciclo = o.optInt("ciclo", 10);
+        a.trabalho = o.optInt("trabalho", 4);
+        a.inicio = o.optLong("inicio", LocalDate.now().toEpochDay());
+        JSONArray h = o.optJSONArray("horarios");
+        if (h != null) {
+            a.horarios = new int[h.length()];
+            for (int i = 0; i < h.length(); i++) a.horarios[i] = h.getInt(i);
+        }
+        a.ha = o.optInt("ha", 290);
+        a.zh = o.optInt("zh", 1010);
+        JSONArray tn = o.optJSONArray("turnos");
+        if (tn != null) {
+            a.turnos = new int[tn.length()];
+            for (int i = 0; i < tn.length(); i++) a.turnos[i] = tn.getInt(i);
+        }
+        JSONObject ex = o.optJSONObject("exc");
+        if (ex != null) {
+            Iterator<String> it = ex.keys();
+            while (it.hasNext()) {
+                String k = it.next();
+                try {
+                    a.exc.put(Long.parseLong(k), ex.getInt(k));
+                } catch (Exception ignored) { }
+            }
+        }
+        a.diaMes = o.optInt("diaMes", 1);
+        a.minutos = o.optInt("minutos", 540);
+        return a;
+    }
+}
+@@@FILE app/src/main/java/com/escala/alarme/Ui.java
+package com.escala.alarme;
+
+import android.content.Context;
+import android.content.res.ColorStateList;
+import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
+import android.text.Editable;
+import android.text.InputType;
+import android.text.TextWatcher;
+import android.util.TypedValue;
+import android.view.Gravity;
+import android.widget.Button;
+import android.widget.CompoundButton;
+import android.widget.EditText;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.Switch;
+import android.widget.TextView;
+
+/** Pequenas peças de interface compartilhadas pelas telas do app. */
+final class Ui {
+
+    static final int PRIMARIO = 0;
+    static final int CONTORNO = 1;
+    static final int PERIGO = 2;
+
+    private Ui() { }
+
+    static int dp(Context c, float v) {
+        return Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v,
+                c.getResources().getDisplayMetrics()));
+    }
+
+    static int cor(Context c, int id) {
+        return c.getColor(id);
+    }
+
+    static GradientDrawable forma(Context c, int fundo, int borda, float raioDp, float tracoDp) {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(fundo);
+        g.setCornerRadius(dp(c, raioDp));
+        if (borda != 0 && tracoDp > 0) g.setStroke(dp(c, tracoDp), borda);
+        return g;
+    }
+
+    static Drawable ondulado(Drawable fundo) {
+        return new RippleDrawable(ColorStateList.valueOf(0x33808080), fundo, null);
+    }
+
+    static TextView texto(Context c, CharSequence t, float sp, boolean negrito, int cor) {
+        TextView v = new TextView(c);
+        v.setText(t);
+        v.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
+        v.setTextColor(cor);
+        if (negrito) v.setTypeface(null, Typeface.BOLD);
+        return v;
+    }
+
+    static LinearLayout.LayoutParams largura() {
+        return new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+    }
+
+    static LinearLayout.LayoutParams largura(Context c, float topoDp) {
+        LinearLayout.LayoutParams lp = largura();
+        lp.topMargin = dp(c, topoDp);
+        return lp;
+    }
+
+    static Button botao(Context c, String t, int estilo) {
+        Button b = new Button(c);
+        b.setText(t);
+        b.setAllCaps(false);
+        b.setStateListAnimator(null);
+        b.setTypeface(null, Typeface.BOLD);
+        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        b.setMinHeight(dp(c, 56));
+        b.setMinimumHeight(dp(c, 56));
+        int fundo;
+        int borda;
+        int txt;
+        if (estilo == PRIMARIO) {
+            fundo = cor(c, R.color.primary);
+            borda = fundo;
+            txt = cor(c, R.color.on_primary);
+        } else if (estilo == PERIGO) {
+            fundo = 0;
+            borda = 0;
+            txt = cor(c, R.color.danger);
+        } else {
+            fundo = cor(c, R.color.card);
+            borda = cor(c, R.color.line);
+            txt = cor(c, R.color.ink);
+        }
+        b.setBackground(ondulado(forma(c, fundo, borda, 16, 2)));
+        b.setTextColor(txt);
+        return b;
+    }
+
+    static Switch interruptor(Context c, boolean ligado, CompoundButton.OnCheckedChangeListener l) {
+        Switch s = new Switch(c);
+        s.setChecked(ligado);
+        int[][] estados = {{android.R.attr.state_checked}, {}};
+        s.setThumbTintList(new ColorStateList(estados,
+                new int[]{cor(c, R.color.on_primary), cor(c, R.color.mute)}));
+        s.setTrackTintList(new ColorStateList(estados,
+                new int[]{cor(c, R.color.primary), cor(c, R.color.line)}));
+        s.setScaleX(1.2f);
+        s.setScaleY(1.2f);
+        s.setOnCheckedChangeListener(l);
+        return s;
+    }
+
+    static final String[] SEMANA = {"seg", "ter", "qua", "qui", "sex", "sáb", "dom"};
+
+    private static Typeface preto() {
+        return Typeface.create("sans-serif-black", Typeface.NORMAL);
+    }
+
+    /**
+     * Um quadradinho de dia: número dentro, dia da semana embaixo e uma etiqueta de turno (HA/ZH) no canto.
+     * Sábado e domingo ficam em negrito forte.
+     */
+    static LinearLayout celula(Context c, String num, String sem, boolean cheio, boolean hoje,
+                               boolean fds, boolean tracejado, String turno, int altDp) {
+        int ink = cor(c, R.color.ink);
+        int mute = cor(c, R.color.mute);
+        LinearLayout col = new LinearLayout(c);
+        col.setOrientation(LinearLayout.VERTICAL);
+        FrameLayout f = new FrameLayout(c);
+
+        TextView t = texto(c, num, 12, true, cheio ? cor(c, R.color.on_primary) : (fds ? ink : mute));
+        t.setGravity(Gravity.CENTER);
+        if (fds) t.setTypeface(preto());
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(cheio ? cor(c, R.color.ciclo) : 0);
+        g.setCornerRadius(dp(c, 8));
+        if (tracejado && !hoje) {
+            g.setStroke(dp(c, 2), mute, dp(c, 4), dp(c, 3));
+        } else {
+            g.setStroke(dp(c, hoje ? 3 : 2), hoje ? ink : cor(c, cheio ? R.color.ciclo : R.color.line));
+        }
+        t.setBackground(g);
+        FrameLayout.LayoutParams lt = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, dp(c, altDp));
+        lt.topMargin = dp(c, 7);
+        f.addView(t, lt);
+
+        if (turno != null) {
+            TextView b = texto(c, turno, 9, true, cor(c, R.color.bg));
+            b.setBackground(forma(c, ink, 0, 6, 0));
+            b.setPadding(dp(c, 3), 0, dp(c, 3), 0);
+            FrameLayout.LayoutParams lb = new FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+            lb.gravity = Gravity.TOP | Gravity.END;
+            f.addView(b, lb);
+        }
+        col.addView(f, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        TextView s = texto(c, sem, 10, fds || hoje, (fds || hoje) ? ink : mute);
+        if (fds) s.setTypeface(preto());
+        s.setGravity(Gravity.CENTER);
+        col.addView(s, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        return col;
+    }
+
+    static String nomeTurno(int t) {
+        return t == Alarme.HA ? "HA" : t == Alarme.ZH ? "ZH" : null;
+    }
+
+    interface Mudou {
+        void valor(int v);
+    }
+
+    /** Número com botões − e +, e o campo no meio também aceita digitar. */
+    static class Passo extends LinearLayout {
+        final EditText campo;
+        int min;
+        int max;
+
+        Passo(Context c, int min, int max, Mudou mudou) {
+            super(c);
+            this.min = min;
+            this.max = max;
+            setOrientation(HORIZONTAL);
+            setGravity(Gravity.CENTER_VERTICAL);
+
+            Button menos = botaoPasso(c, "−");
+            Button mais = botaoPasso(c, "+");
+            campo = new EditText(c);
+            campo.setInputType(InputType.TYPE_CLASS_NUMBER);
+            campo.setSingleLine(true);
+            campo.setGravity(Gravity.CENTER);
+            campo.setTextSize(TypedValue.COMPLEX_UNIT_SP, 28);
+            campo.setTypeface(null, Typeface.BOLD);
+            campo.setTextColor(cor(c, R.color.ink));
+
+            addView(menos);
+            addView(campo, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
+            addView(mais);
+
+            menos.setOnClickListener(v -> definir(limitar(valor(min) - 1)));
+            mais.setOnClickListener(v -> definir(limitar(valor(min) + 1)));
+            campo.addTextChangedListener(new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence s, int a, int b, int d) { }
+
+                @Override
+                public void onTextChanged(CharSequence s, int a, int b, int d) { }
+
+                @Override
+                public void afterTextChanged(Editable s) {
+                    int v = valor(-1);
+                    if (v >= Passo.this.min && v <= Passo.this.max) mudou.valor(v);
+                }
+            });
+        }
+
+        private static Button botaoPasso(Context c, String t) {
+            Button b = botao(c, t, CONTORNO);
+            b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 28);
+            b.setMinWidth(0);
+            b.setMinimumWidth(0);
+            b.setPadding(0, 0, 0, 0);
+            b.setLayoutParams(new LayoutParams(dp(c, 56), dp(c, 56)));
+            return b;
+        }
+
+        private int limitar(int v) {
+            return Math.max(min, Math.min(max, v));
+        }
+
+        int valor(int padrao) {
+            try {
+                return Integer.parseInt(campo.getText().toString().trim());
+            } catch (Exception e) {
+                return padrao;
+            }
+        }
+
+        void definir(int v) {
+            campo.setText(String.valueOf(v));
+        }
+    }
+}
+@@@FILE app/src/main/java/com/escala/alarme/MainActivity.java
+package com.escala.alarme;
+
+import android.Manifest;
+import android.app.Activity;
+import android.app.NotificationManager;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.graphics.drawable.Drawable;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.PowerManager;
+import android.provider.Settings;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.Button;
+import android.widget.ImageButton;
+import android.widget.LinearLayout;
+import android.widget.Switch;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Locale;
+
+public class MainActivity extends Activity {
+
+    private static final int PEDIR_NOTIF = 1;
+    private static final Locale BR = Locale.forLanguageTag("pt-BR");
+
+    private Escala escala;
+    private LinearLayout avisos, lista;
+    private TextView txtVersao, subtitulo;
+    private Atualizador.Info novaVersao;
+    private boolean baixando = false;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        escala = new Escala(this);
+
+        avisos = findViewById(R.id.avisos);
+        lista = findViewById(R.id.lista);
+        subtitulo = findViewById(R.id.subtitulo);
+        subtitulo.setTextColor(Ui.cor(this, R.color.mute));
+        ((TextView) findViewById(R.id.titulo)).setTextColor(Ui.cor(this, R.color.ink));
+
+        ImageButton config = findViewById(R.id.btnConfig);
+        Drawable engrenagem = getDrawable(R.drawable.ic_engrenagem).mutate();
+        engrenagem.setTint(Ui.cor(this, R.color.ink));
+        config.setImageDrawable(engrenagem);
+        config.setBackground(Ui.ondulado(Ui.forma(this, Ui.cor(this, R.color.card),
+                Ui.cor(this, R.color.line), 14, 2)));
+        config.setOnClickListener(v -> startActivity(new Intent(this, ConfigActivity.class)));
+
+        Button novo = findViewById(R.id.btnNovo);
+        novo.setAllCaps(false);
+        novo.setStateListAnimator(null);
+        novo.setTextSize(18);
+        novo.setTypeface(null, android.graphics.Typeface.BOLD);
+        novo.setTextColor(Ui.cor(this, R.color.on_primary));
+        novo.setBackground(Ui.ondulado(Ui.forma(this, Ui.cor(this, R.color.primary), 0, 20, 0)));
+        novo.setOnClickListener(v -> startActivity(new Intent(this, EditarActivity.class)));
+
+        if (Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, PEDIR_NOTIF);
+        }
+
+        // Rodapé: versão instalada e botão de atualização.
+        LinearLayout conteudo = findViewById(R.id.conteudo);
+        txtVersao = Ui.texto(this, "", 14, false, Ui.cor(this, R.color.mute));
+        txtVersao.setGravity(Gravity.CENTER);
+        txtVersao.setPadding(0, Ui.dp(this, 16), 0, Ui.dp(this, 4));
+        conteudo.addView(txtVersao, Ui.largura());
+        Button btnVerificar = Ui.botao(this, "Verificar atualização", Ui.CONTORNO);
+        btnVerificar.setOnClickListener(v -> verificarAtualizacao(true));
+        conteudo.addView(btnVerificar, Ui.largura());
+        txtVersao.setText("Versão " + Atualizador.versaoInstalada(this));
+        verificarAtualizacao(false);
+    }
+
+    private void verificarAtualizacao(boolean manual) {
+        String base = "Versão " + Atualizador.versaoInstalada(this);
+        if (manual) txtVersao.setText(base + " — verificando...");
+        Atualizador.verificar(this, (nova, erro) -> {
+            if (isDestroyed()) return;
+            novaVersao = nova;
+            if (nova != null) {
+                txtVersao.setText(base + " — versão " + nova.versao + " disponível");
+            } else if (erro != null) {
+                txtVersao.setText(manual ? base + " — não foi possível verificar (" + erro + ")" : base);
+            } else {
+                txtVersao.setText(base + " — você está na última versão");
+            }
+            montarAvisos();
+        });
+    }
+
+    private void iniciarAtualizacao() {
+        if (baixando || novaVersao == null) return;
+        if (!getPackageManager().canRequestPackageInstalls()) {
+            Toast.makeText(this, "Permita instalar apps por aqui e depois toque em Atualizar de novo.",
+                    Toast.LENGTH_LONG).show();
+            abrir(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                    Uri.parse("package:" + getPackageName())));
+            return;
+        }
+        baixando = true;
+        Atualizador.baixarEInstalar(this, novaVersao, (texto, terminou) -> {
+            if (isDestroyed()) return;
+            txtVersao.setText(texto);
+            if (terminou) baixando = false;
+        });
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        atualizar();
+    }
+
+    /** Redesenha a tela e remarca o próximo alarme. */
+    private void atualizar() {
+        Agendador.agendar(this);
+        String data = LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, dd/MM", BR));
+        subtitulo.setText(data.substring(0, 1).toUpperCase(BR) + data.substring(1));
+        montarAvisos();
+        montarLista();
+    }
+
+    private void montarLista() {
+        lista.removeAllViews();
+        List<Alarme> todos = escala.alarmes();
+        if (todos.isEmpty()) {
+            TextView vazio = Ui.texto(this,
+                    "Nenhum alarme ainda. Toque em \"+ Novo alarme\" para criar o primeiro.",
+                    16, false, Ui.cor(this, R.color.mute));
+            lista.addView(vazio, Ui.largura());
+            return;
+        }
+        for (Alarme a : todos) lista.addView(cartao(a));
+    }
+
+    // ---------- cartão de cada alarme ----------
+
+    private View cartao(Alarme a) {
+        boolean ciclo = a.tipo == Alarme.CICLO;
+        int corTipo = Ui.cor(this, ciclo ? R.color.ciclo : R.color.mensal);
+        int corSoft = Ui.cor(this, ciclo ? R.color.ciclo_soft : R.color.mensal_soft);
+        int ink = Ui.cor(this, R.color.ink);
+        int mute = Ui.cor(this, R.color.mute);
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        int p = Ui.dp(this, 16);
+        card.setPadding(p, p, p, p);
+        card.setBackground(Ui.ondulado(Ui.forma(this, Ui.cor(this, R.color.card),
+                Ui.cor(this, R.color.line), 20, 2)));
+        card.setAlpha(a.ativo ? 1f : 0.62f);
+
+        // linha de cima: nome + interruptor
+        LinearLayout topo = new LinearLayout(this);
+        topo.setGravity(Gravity.CENTER_VERTICAL);
+        topo.addView(Ui.texto(this, a.nome, 20, true, ink),
+                new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        Switch sw = Ui.interruptor(this, a.ativo, (b, v) -> {
+            a.ativo = v;
+            escala.salvarUm(a);
+            atualizar();
+        });
+        topo.addView(sw);
+        card.addView(topo, Ui.largura());
+
+        LocalDateTime prox = a.proximo(LocalDateTime.now());
+        TextView hora = Ui.texto(this, prox != null ? Alarme.hhmm(prox.getHour() * 60 + prox.getMinute()) : "—:—",
+                44, true, ink);
+        hora.setFontFeatureSettings("tnum");
+        card.addView(hora, Ui.largura(this, 4));
+
+        LinearLayout quando = new LinearLayout(this);
+        quando.setGravity(Gravity.CENTER_VERTICAL);
+        if (!a.ativo) {
+            quando.addView(Ui.texto(this, "Desligado", 15, false, mute));
+        } else if (prox == null) {
+            quando.addView(Ui.texto(this, "Sem próximo alarme", 15, false, mute));
+        } else {
+            long dias = ChronoUnit.DAYS.between(LocalDate.now(), prox.toLocalDate());
+            String rotulo = dias <= 0 ? "hoje" : dias == 1 ? "amanhã" : "em " + dias + " dias";
+            TextView chip = Ui.texto(this, rotulo, 13, true, Ui.cor(this, R.color.bg));
+            chip.setBackground(Ui.forma(this, ink, 0, 8, 0));
+            chip.setPadding(Ui.dp(this, 8), Ui.dp(this, 2), Ui.dp(this, 8), Ui.dp(this, 2));
+            quando.addView(chip);
+            String data = prox.format(DateTimeFormatter.ofPattern("EEE, dd/MM", BR));
+            if (!ciclo) data += " · todo dia " + a.diaMes;
+            TextView dt = Ui.texto(this, data, 15, false, mute);
+            dt.setPadding(Ui.dp(this, 8), 0, 0, 0);
+            quando.addView(dt);
+        }
+        card.addView(quando, Ui.largura());
+
+        if (ciclo) card.addView(faixa(a), Ui.largura(this, 12));
+
+        // rótulo do tipo, lá embaixo
+        TextView tag = Ui.texto(this, ciclo ? "Escala de trabalho" : "Todo mês", 13, true, corTipo);
+        Drawable icone = getDrawable(ciclo ? R.drawable.ic_ciclo : R.drawable.ic_calendario).mutate();
+        icone.setTint(corTipo);
+        int d16 = Ui.dp(this, 16);
+        icone.setBounds(0, 0, d16, d16);
+        tag.setCompoundDrawables(icone, null, null, null);
+        tag.setCompoundDrawablePadding(Ui.dp(this, 6));
+        tag.setBackground(Ui.forma(this, corSoft, 0, 999, 0));
+        tag.setPadding(Ui.dp(this, 10), Ui.dp(this, 4), Ui.dp(this, 12), Ui.dp(this, 4));
+        LinearLayout.LayoutParams ltag = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        ltag.topMargin = Ui.dp(this, 12);
+        card.addView(tag, ltag);
+
+        card.setOnClickListener(v -> startActivity(
+                new Intent(this, EditarActivity.class).putExtra("id", a.id)));
+
+        LinearLayout.LayoutParams lp = Ui.largura();
+        lp.bottomMargin = Ui.dp(this, 12);
+        card.setLayoutParams(lp);
+        return card;
+    }
+
+    /** Faixa com um quadradinho por dia do ciclo: cheio = trabalho, contorno forte = hoje. */
+    private View faixa(Alarme a) {
+        int hoje = a.posicao(LocalDate.now());
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+
+        if (a.ciclo <= 14) {
+            LinearLayout fila = new LinearLayout(this);
+            LocalDate inicioCiclo = LocalDate.now().minusDays(hoje);
+            for (int i = 0; i < a.ciclo; i++) {
+                LocalDate dia = inicioCiclo.plusDays(i);
+                int turno = a.turnoEm(dia);
+                int sem = dia.getDayOfWeek().getValue();
+                View cel = Ui.celula(this, String.valueOf(i + 1), Ui.SEMANA[sem - 1], turno != Alarme.NADA,
+                        i == hoje, sem >= 6, false, Ui.nomeTurno(turno), 30);
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0,
+                        LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+                lp.setMargins(Ui.dp(this, 2), 0, Ui.dp(this, 2), 0);
+                fila.addView(cel, lp);
+            }
+            col.addView(fila, Ui.largura());
+        }
+
+        String esquerda = "Dia " + (hoje + 1) + " de " + a.ciclo;
+        String direita;
+        if (hoje < a.trabalho) {
+            int resta = a.trabalho - 1 - hoje;
+            direita = resta == 0 ? "Último dia de trabalho" : "Trabalha mais " + resta + (resta == 1 ? " dia" : " dias");
+        } else {
+            int volta = a.ciclo - hoje;
+            direita = "Folga: volta em " + volta + (volta == 1 ? " dia" : " dias");
+        }
+        LinearLayout legenda = new LinearLayout(this);
+        legenda.addView(Ui.texto(this, esquerda, 13, false, Ui.cor(this, R.color.mute)),
+                new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        legenda.addView(Ui.texto(this, direita, 13, false, Ui.cor(this, R.color.mute)));
+        col.addView(legenda, Ui.largura(this, 6));
+        return col;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        atualizar();
+    }
+
+    // ---------- avisos ----------
+
+    private void montarAvisos() {
+        avisos.removeAllViews();
+        String pkg = "package:" + getPackageName();
+
+        if (novaVersao != null) {
+            aviso("Tem uma versão nova do app (" + novaVersao.versao + ").",
+                    "Atualizar agora", this::iniciarAtualizacao, true);
+        }
+
+        if (Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            aviso("Sem permissão de notificação, o alarme pode não aparecer na tela.",
+                    "Permitir notificações", () -> {
+                        if (shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) {
+                            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, PEDIR_NOTIF);
+                        } else {
+                            abrir(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                    .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName()));
+                        }
+                    }, false);
+        }
+
+        if (!Agendador.podeAgendar(this) && Build.VERSION.SDK_INT >= 31) {
+            aviso("O app precisa de permissão para \"Alarmes e lembretes\". Sem ela o alarme NÃO toca.",
+                    "Dar permissão", () -> abrir(new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                            Uri.parse(pkg))), false);
+        }
+
+        if (Build.VERSION.SDK_INT >= 34) {
+            NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            if (!nm.canUseFullScreenIntent()) {
+                aviso("Permita \"notificações em tela cheia\" para o alarme aparecer com o celular bloqueado.",
+                        "Permitir tela cheia", () -> abrir(new Intent(
+                                Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse(pkg))), false);
+            }
+        }
+
+        PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        if (!pm.isIgnoringBatteryOptimizations(getPackageName())) {
+            aviso("Recomendado: tirar o app da economia de bateria, para o celular não bloquear o alarme.",
+                    "Liberar bateria", () -> abrir(new Intent(
+                            Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse(pkg))), false);
+        }
+    }
+
+    private void aviso(String texto, String botao, Runnable acao, boolean novidade) {
+        LinearLayout caixa = new LinearLayout(this);
+        caixa.setOrientation(LinearLayout.VERTICAL);
+        int p = Ui.dp(this, 14);
+        caixa.setPadding(p, p, p, p);
+        caixa.setBackground(Ui.forma(this,
+                Ui.cor(this, novidade ? R.color.ciclo_soft : R.color.mensal_soft), 0, 16, 0));
+
+        caixa.addView(Ui.texto(this, texto, 15, false, Ui.cor(this, R.color.ink)), Ui.largura());
+
+        Button b = Ui.botao(this, botao, novidade ? Ui.PRIMARIO : Ui.CONTORNO);
+        b.setOnClickListener(v -> acao.run());
+        caixa.addView(b, Ui.largura(this, 10));
+
+        LinearLayout.LayoutParams lp = Ui.largura();
+        lp.bottomMargin = Ui.dp(this, 10);
+        avisos.addView(caixa, lp);
+    }
+
+    private void abrir(Intent i) {
+        try {
+            startActivity(i);
+        } catch (Exception e) {
+            try {
+                startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:" + getPackageName())));
+            } catch (Exception ignored) { }
+        }
+    }
+}
+@@@FILE app/src/main/java/com/escala/alarme/EditarActivity.java
+package com.escala.alarme;
+
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.app.DatePickerDialog;
+import android.app.TimePickerDialog;
+import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
+import android.os.Bundle;
+import android.text.InputType;
+import android.util.TypedValue;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.ImageButton;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.Switch;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.Locale;
+
+/** Tela para criar ou editar um alarme. */
+public class EditarActivity extends Activity {
+
+    private static final Locale BR = Locale.forLanguageTag("pt-BR");
+
+    private Escala escala;
+    private Alarme a;
+    private boolean novo;
+
+    private EditText edNome;
+    private Ui.Passo pCiclo, pTrabalho, pDia;
+    private Button btnCiclo, btnMensal, btnInicio, btnHoraMensal;
+    private LinearLayout boxCiclo, boxMensal, boxHorarios, boxCal;
+    private Button btnHA, btnZH;
+
+    private LocalDate dataInicio;
+    private int minutosMensal;
+    private int minHA, minZH;
+    private int[] hs = new int[0];
+    private boolean[] lig = new boolean[0];
+    private int[] tn = new int[0];
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        escala = new Escala(this);
+        long id = getIntent().getLongExtra("id", 0L);
+        Alarme existente = id != 0L ? escala.buscar(id) : null;
+        novo = existente == null;
+        a = novo ? Alarme.novo() : existente;
+        construirTela();
+        preencher();
+    }
+
+    // ---------- montagem da tela ----------
+
+    private void construirTela() {
+        LinearLayout raiz = new LinearLayout(this);
+        raiz.setOrientation(LinearLayout.VERTICAL);
+        int pad = Ui.dp(this, 16);
+        raiz.setPadding(pad, pad, pad, Ui.dp(this, 32));
+
+        ScrollView sv = new ScrollView(this);
+        sv.setFitsSystemWindows(true);
+        sv.addView(raiz);
+        setContentView(sv);
+
+        // cabeçalho
+        LinearLayout topo = new LinearLayout(this);
+        topo.setGravity(Gravity.CENTER_VERTICAL);
+        ImageButton voltar = new ImageButton(this);
+        Drawable seta = getDrawable(R.drawable.ic_voltar).mutate();
+        seta.setTint(Ui.cor(this, R.color.ink));
+        voltar.setImageDrawable(seta);
+        voltar.setContentDescription("Voltar");
+        voltar.setBackground(Ui.ondulado(Ui.forma(this, Ui.cor(this, R.color.card),
+                Ui.cor(this, R.color.line), 14, 2)));
+        voltar.setOnClickListener(v -> finish());
+        topo.addView(voltar, new LinearLayout.LayoutParams(Ui.dp(this, 52), Ui.dp(this, 52)));
+        TextView titulo = Ui.texto(this, novo ? "Novo alarme" : "Editar alarme", 24, true,
+                Ui.cor(this, R.color.ink));
+        titulo.setPadding(Ui.dp(this, 14), 0, 0, 0);
+        topo.addView(titulo);
+        raiz.addView(topo, Ui.largura());
+
+        // nome
+        raiz.addView(rotulo("Nome"), Ui.largura(this, 20));
+        edNome = new EditText(this);
+        edNome.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        edNome.setSingleLine(true);
+        edNome.setHint("Ex.: Trabalho, Aluguel");
+        edNome.setHintTextColor(Ui.cor(this, R.color.mute));
+        edNome.setTextColor(Ui.cor(this, R.color.ink));
+        edNome.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+        edNome.setMinHeight(Ui.dp(this, 56));
+        edNome.setPadding(Ui.dp(this, 14), 0, Ui.dp(this, 14), 0);
+        edNome.setBackground(Ui.forma(this, Ui.cor(this, R.color.card),
+                Ui.cor(this, R.color.line), 14, 2));
+        raiz.addView(edNome, Ui.largura(this, 6));
+
+        // tipo
+        raiz.addView(rotulo("Como repete"), Ui.largura(this, 20));
+        LinearLayout tipos = new LinearLayout(this);
+        btnCiclo = botaoTipo("Ciclo de dias", R.drawable.ic_ciclo);
+        btnMensal = botaoTipo("Todo mês", R.drawable.ic_calendario);
+        btnCiclo.setOnClickListener(v -> escolherTipo(Alarme.CICLO));
+        btnMensal.setOnClickListener(v -> escolherTipo(Alarme.MENSAL));
+        LinearLayout.LayoutParams l1 = new LinearLayout.LayoutParams(0, Ui.dp(this, 64), 1f);
+        l1.rightMargin = Ui.dp(this, 4);
+        LinearLayout.LayoutParams l2 = new LinearLayout.LayoutParams(0, Ui.dp(this, 64), 1f);
+        l2.leftMargin = Ui.dp(this, 4);
+        tipos.addView(btnCiclo, l1);
+        tipos.addView(btnMensal, l2);
+        raiz.addView(tipos, Ui.largura(this, 6));
+
+        // --- opções do ciclo ---
+        boxCiclo = new LinearLayout(this);
+        boxCiclo.setOrientation(LinearLayout.VERTICAL);
+        boxCiclo.addView(rotulo("Duração do ciclo (dias)"), Ui.largura(this, 20));
+        pCiclo = new Ui.Passo(this, 2, 365, v -> {
+            pTrabalho.max = Math.min(31, v);
+            if (pTrabalho.valor(1) > pTrabalho.max) pTrabalho.definir(pTrabalho.max);
+            montarCalendario();
+        });
+        boxCiclo.addView(pCiclo, Ui.largura(this, 6));
+        boxCiclo.addView(rotulo("Dias de trabalho no começo do ciclo"), Ui.largura(this, 20));
+        pTrabalho = new Ui.Passo(this, 1, 31, v -> {
+            ajustarDias(v);
+            montarHorarios();
+        });
+        boxCiclo.addView(pTrabalho, Ui.largura(this, 6));
+        boxCiclo.addView(rotulo("1º dia de trabalho de um ciclo"), Ui.largura(this, 20));
+        btnInicio = Ui.botao(this, "", Ui.CONTORNO);
+        btnInicio.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        btnInicio.setPadding(Ui.dp(this, 14), 0, Ui.dp(this, 14), 0);
+        btnInicio.setOnClickListener(v -> escolherInicio());
+        boxCiclo.addView(btnInicio, Ui.largura(this, 6));
+        boxCiclo.addView(rotulo("Turnos"), Ui.largura(this, 20));
+        LinearLayout boxTurnos = new LinearLayout(this);
+        boxTurnos.setOrientation(LinearLayout.VERTICAL);
+        boxTurnos.setPadding(Ui.dp(this, 14), Ui.dp(this, 6), Ui.dp(this, 14), Ui.dp(this, 6));
+        boxTurnos.setBackground(Ui.forma(this, Ui.cor(this, R.color.card),
+                Ui.cor(this, R.color.line), 20, 2));
+        btnHA = botaoHora();
+        btnZH = botaoHora();
+        btnHA.setOnClickListener(v -> new TimePickerDialog(this, (tp, h, m) -> {
+            minHA = h * 60 + m;
+            btnHA.setText(Alarme.hhmm(minHA));
+        }, minHA / 60, minHA % 60, true).show());
+        btnZH.setOnClickListener(v -> new TimePickerDialog(this, (tp, h, m) -> {
+            minZH = h * 60 + m;
+            btnZH.setText(Alarme.hhmm(minZH));
+        }, minZH / 60, minZH % 60, true).show());
+        boxTurnos.addView(linhaTurno("HA", btnHA), Ui.largura());
+        boxTurnos.addView(linhaTurno("ZH", btnZH), Ui.largura());
+        boxCiclo.addView(boxTurnos, Ui.largura(this, 6));
+        boxCiclo.addView(rotulo("Calendário dos próximos ciclos"), Ui.largura(this, 20));
+        boxCal = new LinearLayout(this);
+        boxCal.setOrientation(LinearLayout.VERTICAL);
+        boxCiclo.addView(boxCal, Ui.largura(this, 2));
+        boxCiclo.addView(Ui.texto(this,
+                "Toque num dia para ligar ou desligar o alarme só dele. Ao ligar um dia fora da escala, você escolhe HA ou ZH.",
+                14, false, Ui.cor(this, R.color.mute)), Ui.largura(this, 8));
+        boxCiclo.addView(rotulo("Horário de cada dia"), Ui.largura(this, 20));
+        boxHorarios = new LinearLayout(this);
+        boxHorarios.setOrientation(LinearLayout.VERTICAL);
+        boxHorarios.setPadding(Ui.dp(this, 14), Ui.dp(this, 4), Ui.dp(this, 14), Ui.dp(this, 4));
+        boxHorarios.setBackground(Ui.forma(this, Ui.cor(this, R.color.card),
+                Ui.cor(this, R.color.line), 20, 2));
+        boxCiclo.addView(boxHorarios, Ui.largura(this, 6));
+        raiz.addView(boxCiclo, Ui.largura());
+
+        // --- opções mensais ---
+        boxMensal = new LinearLayout(this);
+        boxMensal.setOrientation(LinearLayout.VERTICAL);
+        boxMensal.addView(rotulo("Dia do mês (1 a 31)"), Ui.largura(this, 20));
+        pDia = new Ui.Passo(this, 1, 31, v -> { });
+        boxMensal.addView(pDia, Ui.largura(this, 6));
+        boxMensal.addView(Ui.texto(this,
+                "Se o mês não tiver esse dia (ex.: 31 em abril), toca no último dia do mês.",
+                14, false, Ui.cor(this, R.color.mute)), Ui.largura(this, 8));
+        boxMensal.addView(rotulo("Horário"), Ui.largura(this, 20));
+        btnHoraMensal = Ui.botao(this, "", Ui.CONTORNO);
+        btnHoraMensal.setTextSize(TypedValue.COMPLEX_UNIT_SP, 28);
+        btnHoraMensal.setMinHeight(Ui.dp(this, 64));
+        btnHoraMensal.setOnClickListener(v -> new TimePickerDialog(this, (tp, h, m) -> {
+            minutosMensal = h * 60 + m;
+            btnHoraMensal.setText(Alarme.hhmm(minutosMensal));
+        }, minutosMensal / 60, minutosMensal % 60, true).show());
+        boxMensal.addView(btnHoraMensal, Ui.largura(this, 6));
+        raiz.addView(boxMensal, Ui.largura());
+
+        // --- botões ---
+        Button salvar = Ui.botao(this, "Salvar", Ui.PRIMARIO);
+        salvar.setOnClickListener(v -> salvar());
+        raiz.addView(salvar, Ui.largura(this, 28));
+
+        if (!novo) {
+            Button excluir = Ui.botao(this, "Excluir alarme", Ui.PERIGO);
+            excluir.setOnClickListener(v -> new AlertDialog.Builder(this)
+                    .setMessage("Excluir o alarme \"" + a.nome + "\"?")
+                    .setPositiveButton("Excluir", (d, w) -> {
+                        escala.remover(a.id);
+                        Agendador.agendar(this);
+                        finish();
+                    })
+                    .setNegativeButton("Cancelar", null)
+                    .show());
+            raiz.addView(excluir, Ui.largura(this, 8));
+        }
+
+        Button cancelar = Ui.botao(this, "Cancelar", Ui.CONTORNO);
+        cancelar.setOnClickListener(v -> finish());
+        raiz.addView(cancelar, Ui.largura(this, 8));
+    }
+
+    private Button botaoHora() {
+        Button b = Ui.botao(this, "", Ui.CONTORNO);
+        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
+        b.setMinHeight(Ui.dp(this, 48));
+        b.setMinimumHeight(Ui.dp(this, 48));
+        b.setMinWidth(Ui.dp(this, 96));
+        b.setMinimumWidth(Ui.dp(this, 96));
+        return b;
+    }
+
+    private LinearLayout linhaTurno(String nome, Button hora) {
+        LinearLayout l = new LinearLayout(this);
+        l.setGravity(Gravity.CENTER_VERTICAL);
+        l.setPadding(0, Ui.dp(this, 8), 0, Ui.dp(this, 8));
+        LinearLayout nomes = new LinearLayout(this);
+        nomes.setOrientation(LinearLayout.VERTICAL);
+        nomes.addView(Ui.texto(this, nome, 17, true, Ui.cor(this, R.color.ink)));
+        nomes.addView(Ui.texto(this, "horário do alarme", 13, false, Ui.cor(this, R.color.mute)));
+        l.addView(nomes, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        l.addView(hora);
+        return l;
+    }
+
+    private Button botaoTipo(String texto, int icone) {
+        Button b = Ui.botao(this, texto, Ui.CONTORNO);
+        Drawable d = getDrawable(icone).mutate();
+        d.setTint(Ui.cor(this, R.color.ink));
+        int s = Ui.dp(this, 22);
+        d.setBounds(0, 0, s, s);
+        b.setCompoundDrawables(d, null, null, null);
+        b.setCompoundDrawablePadding(Ui.dp(this, 8));
+        b.setPadding(Ui.dp(this, 8), 0, Ui.dp(this, 8), 0);
+        return b;
+    }
+
+    private void escolherTipo(int tipo) {
+        a.tipo = tipo;
+        mostrarTipo();
+    }
+
+    private void mostrarTipo() {
+        boolean mensal = a.tipo == Alarme.MENSAL;
+        boxCiclo.setVisibility(mensal ? View.GONE : View.VISIBLE);
+        boxMensal.setVisibility(mensal ? View.VISIBLE : View.GONE);
+        marcar(btnCiclo, !mensal);
+        marcar(btnMensal, mensal);
+    }
+
+    private void marcar(Button b, boolean ligado) {
+        int borda = Ui.cor(this, ligado ? R.color.primary : R.color.line);
+        b.setBackground(Ui.ondulado(Ui.forma(this, Ui.cor(this, R.color.card), borda, 16,
+                ligado ? 3 : 2)));
+    }
+
+    private void preencher() {
+        edNome.setText(novo ? "" : a.nome);
+
+        hs = new int[a.trabalho];
+        lig = new boolean[a.trabalho];
+        tn = new int[a.trabalho];
+        for (int i = 0; i < a.trabalho; i++) {
+            int m = a.horarioDoDia(i);
+            lig[i] = m >= 0;
+            hs[i] = m >= 0 ? m : 360;
+            tn[i] = a.turnoDoDia(i);
+        }
+        minHA = a.ha;
+        minZH = a.zh;
+        btnHA.setText(Alarme.hhmm(minHA));
+        btnZH.setText(Alarme.hhmm(minZH));
+        pCiclo.definir(a.ciclo);
+        pTrabalho.definir(a.trabalho);
+
+        dataInicio = LocalDate.ofEpochDay(a.inicio);
+        atualizarTextoInicio();
+
+        pDia.definir(a.diaMes);
+        minutosMensal = a.minutos;
+        btnHoraMensal.setText(Alarme.hhmm(minutosMensal));
+
+        montarHorarios();
+        mostrarTipo();
+    }
+
+    // ---------- horários do ciclo ----------
+
+    private void ajustarDias(int n) {
+        int[] nh = new int[n];
+        boolean[] nl = new boolean[n];
+        int[] nt = new int[n];
+        for (int i = 0; i < n; i++) {
+            if (i < hs.length) {
+                nh[i] = hs[i];
+                nl[i] = lig[i];
+                nt[i] = tn[i];
+            } else {
+                nh[i] = hs.length > 0 ? hs[hs.length - 1] : 360;
+                nl[i] = true;
+                nt[i] = tn.length > 0 ? tn[tn.length - 1] : Alarme.HA;
+            }
+        }
+        hs = nh;
+        lig = nl;
+        tn = nt;
+    }
+
+    private void montarHorarios() {
+        if (boxHorarios == null || dataInicio == null) return;
+        boxHorarios.removeAllViews();
+        for (int i = 0; i < hs.length; i++) {
+            final int dia = i;
+            LinearLayout linha = new LinearLayout(this);
+            linha.setGravity(Gravity.CENTER_VERTICAL);
+            linha.setPadding(0, Ui.dp(this, 8), 0, Ui.dp(this, 8));
+
+            LinearLayout nomes = new LinearLayout(this);
+            nomes.setOrientation(LinearLayout.VERTICAL);
+            nomes.addView(Ui.texto(this, "Dia " + (i + 1), 16, true, Ui.cor(this, R.color.ink)));
+            nomes.addView(Ui.texto(this,
+                    dataInicio.plusDays(i).format(DateTimeFormatter.ofPattern("EEE, dd/MM", BR)),
+                    13, false, Ui.cor(this, R.color.mute)));
+            linha.addView(nomes, new LinearLayout.LayoutParams(0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+            Button turno = Ui.botao(this, Ui.nomeTurno(tn[i]), Ui.CONTORNO);
+            turno.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+            turno.setMinHeight(Ui.dp(this, 48));
+            turno.setMinimumHeight(Ui.dp(this, 48));
+            turno.setMinWidth(Ui.dp(this, 52));
+            turno.setMinimumWidth(Ui.dp(this, 52));
+            turno.setPadding(Ui.dp(this, 6), 0, Ui.dp(this, 6), 0);
+            turno.setEnabled(lig[i]);
+            turno.setAlpha(lig[i] ? 1f : 0.45f);
+            turno.setOnClickListener(v -> {
+                tn[dia] = tn[dia] == Alarme.HA ? Alarme.ZH : Alarme.HA;
+                turno.setText(Ui.nomeTurno(tn[dia]));
+                montarCalendario();
+            });
+            LinearLayout.LayoutParams lpt = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lpt.rightMargin = Ui.dp(this, 6);
+            linha.addView(turno, lpt);
+
+            Button hora = Ui.botao(this, Alarme.hhmm(hs[i]), Ui.CONTORNO);
+            hora.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
+            hora.setMinHeight(Ui.dp(this, 48));
+            hora.setMinimumHeight(Ui.dp(this, 48));
+            hora.setMinWidth(Ui.dp(this, 80));
+            hora.setMinimumWidth(Ui.dp(this, 80));
+            hora.setEnabled(lig[i]);
+            hora.setAlpha(lig[i] ? 1f : 0.45f);
+            hora.setOnClickListener(v -> new TimePickerDialog(this, (tp, h, m) -> {
+                hs[dia] = h * 60 + m;
+                montarHorarios();
+            }, hs[dia] / 60, hs[dia] % 60, true).show());
+            linha.addView(hora);
+
+            Switch sw = Ui.interruptor(this, lig[i], (b, marcado) -> {
+                lig[dia] = marcado;
+                hora.setEnabled(marcado);
+                hora.setAlpha(marcado ? 1f : 0.45f);
+                turno.setEnabled(marcado);
+                turno.setAlpha(marcado ? 1f : 0.45f);
+                montarCalendario();
+            });
+            LinearLayout.LayoutParams lps = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lps.leftMargin = Ui.dp(this, 8);
+            lps.rightMargin = Ui.dp(this, 4);
+            linha.addView(sw, lps);
+
+            boxHorarios.addView(linha, Ui.largura());
+        }
+        montarCalendario();
+    }
+
+    // ---------- calendário dos próximos ciclos ----------
+
+    /** Passa o que está na tela para o alarme em edição (sem validar), para o calendário refletir. */
+    private void sincronizar() {
+        int ciclo = pCiclo.valor(a.ciclo);
+        int trab = pTrabalho.valor(a.trabalho);
+        if (ciclo < 2 || ciclo > 365 || trab < 1 || trab > ciclo || trab > 31) return;
+        if (hs.length != trab || dataInicio == null) return;
+        a.ciclo = ciclo;
+        a.trabalho = trab;
+        a.inicio = dataInicio.toEpochDay();
+        a.horarios = new int[trab];
+        a.turnos = new int[trab];
+        for (int i = 0; i < trab; i++) {
+            a.horarios[i] = lig[i] ? hs[i] : -1;
+            a.turnos[i] = tn[i];
+        }
+        a.ha = minHA;
+        a.zh = minZH;
+    }
+
+    private void montarCalendario() {
+        if (boxCal == null || dataInicio == null) return;
+        sincronizar();
+        boxCal.removeAllViews();
+        LocalDate hoje = LocalDate.now();
+        int ciclo = a.ciclo;
+        boolean porCiclo = ciclo <= 14;
+        int cols = porCiclo ? ciclo : 7;
+        int linhas = porCiclo ? 3 : 5;
+        LocalDate base = hoje.minusDays(a.posicao(hoje));
+        DateTimeFormatter dm = DateTimeFormatter.ofPattern("dd/MM", BR);
+        for (int r = 0; r < linhas; r++) {
+            LocalDate ini = base.plusDays((long) r * cols);
+            LocalDate fim = ini.plusDays(cols - 1);
+            String nome = porCiclo ? (r == 0 ? "Ciclo atual" : "Próximo ciclo") : "Semana";
+            boxCal.addView(Ui.texto(this, nome + " · " + ini.format(dm) + " a " + fim.format(dm),
+                    13, true, Ui.cor(this, R.color.mute)), Ui.largura(this, r == 0 ? 6 : 12));
+            LinearLayout fila = new LinearLayout(this);
+            for (int c = 0; c < cols; c++) {
+                final LocalDate d = ini.plusDays(c);
+                int turno = a.turnoEm(d);
+                Integer ex = a.exc.get(d.toEpochDay());
+                int sem = d.getDayOfWeek().getValue();
+                View cel = Ui.celula(this, String.valueOf(d.getDayOfMonth()), Ui.SEMANA[sem - 1],
+                        turno != Alarme.NADA, d.equals(hoje), sem >= 6,
+                        ex != null && ex == Alarme.NADA, Ui.nomeTurno(turno), 34);
+                cel.setOnClickListener(v -> tocarDia(d));
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0,
+                        LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+                lp.setMargins(Ui.dp(this, 1), 0, Ui.dp(this, 1), 0);
+                fila.addView(cel, lp);
+            }
+            boxCal.addView(fila, Ui.largura(this, 4));
+        }
+    }
+
+    private void tocarDia(LocalDate d) {
+        if (a.turnoEm(d) != Alarme.NADA) {
+            // desliga só esse dia
+            if (a.turnoNormal(d) == Alarme.NADA) a.exc.remove(d.toEpochDay());
+            else a.exc.put(d.toEpochDay(), Alarme.NADA);
+            montarCalendario();
+        } else {
+            perguntarTurno(d);
+        }
+    }
+
+    private void perguntarTurno(LocalDate d) {
+        LinearLayout c = new LinearLayout(this);
+        c.setOrientation(LinearLayout.VERTICAL);
+        c.setPadding(Ui.dp(this, 20), Ui.dp(this, 8), Ui.dp(this, 20), 0);
+        c.addView(Ui.texto(this, "Escolha o turno desse dia:", 16, false, Ui.cor(this, R.color.ink)));
+        LinearLayout fila = new LinearLayout(this);
+        final AlertDialog[] dlg = new AlertDialog[1];
+        fila.addView(botaoTurno("HA", Alarme.HA, a.ha, d, dlg), pesoUm(0, 6));
+        fila.addView(botaoTurno("ZH", Alarme.ZH, a.zh, d, dlg), pesoUm(6, 0));
+        c.addView(fila, Ui.largura(this, 12));
+        dlg[0] = new AlertDialog.Builder(this)
+                .setTitle("Trabalhar em " + d.format(DateTimeFormatter.ofPattern("dd/MM", BR)) + "?")
+                .setView(c)
+                .setNegativeButton("Cancelar", null)
+                .create();
+        dlg[0].show();
+    }
+
+    private LinearLayout.LayoutParams pesoUm(int esq, int dir) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        lp.leftMargin = Ui.dp(this, esq);
+        lp.rightMargin = Ui.dp(this, dir);
+        return lp;
+    }
+
+    private Button botaoTurno(String nome, int codigo, int minutos, LocalDate d, AlertDialog[] dlg) {
+        Button b = Ui.botao(this, nome + "\n" + Alarme.hhmm(minutos), Ui.CONTORNO);
+        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
+        b.setMinHeight(Ui.dp(this, 80));
+        b.setMinimumHeight(Ui.dp(this, 80));
+        b.setOnClickListener(v -> {
+            a.exc.put(d.toEpochDay(), codigo);
+            dlg[0].dismiss();
+            montarCalendario();
+        });
+        return b;
+    }
+
+    private void escolherInicio() {
+        new DatePickerDialog(this, (dp, ano, mes, dia) -> {
+            dataInicio = LocalDate.of(ano, mes + 1, dia);
+            atualizarTextoInicio();
+            montarHorarios();
+        }, dataInicio.getYear(), dataInicio.getMonthValue() - 1, dataInicio.getDayOfMonth()).show();
+    }
+
+    private void atualizarTextoInicio() {
+        btnInicio.setText(dataInicio.format(DateTimeFormatter.ofPattern("EEEE, dd/MM/yyyy", BR)));
+    }
+
+    // ---------- salvar ----------
+
+    private void salvar() {
+        String nome = edNome.getText().toString().trim();
+        if (nome.isEmpty()) nome = "Alarme";
+
+        if (a.tipo == Alarme.CICLO) {
+            int ciclo = pCiclo.valor(-1);
+            int trab = pTrabalho.valor(-1);
+            if (ciclo < 2 || ciclo > 365) {
+                erro("A duração do ciclo deve ficar entre 2 e 365 dias.");
+                return;
+            }
+            if (trab < 1 || trab > ciclo || trab > 31) {
+                erro("Os dias de trabalho devem ficar entre 1 e a duração do ciclo (no máximo 31).");
+                return;
+            }
+            ajustarDias(trab);
+            a.ciclo = ciclo;
+            a.trabalho = trab;
+            a.inicio = dataInicio.toEpochDay();
+            a.horarios = new int[trab];
+            a.turnos = new int[trab];
+            for (int i = 0; i < trab; i++) {
+                a.horarios[i] = lig[i] ? hs[i] : -1;
+                a.turnos[i] = tn[i];
+            }
+            a.ha = minHA;
+            a.zh = minZH;
+        } else {
+            int dia = pDia.valor(-1);
+            if (dia < 1 || dia > 31) {
+                erro("O dia do mês deve ficar entre 1 e 31.");
+                return;
+            }
+            a.diaMes = dia;
+            a.minutos = minutosMensal;
+        }
+        a.nome = nome;
+        escala.salvarUm(a);
+        Agendador.agendar(this);
+        finish();
+    }
+
+    private void erro(String msg) {
+        Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+    }
+
+    private TextView rotulo(String texto) {
+        return Ui.texto(this, texto, 16, true, Ui.cor(this, R.color.ink));
+    }
+}

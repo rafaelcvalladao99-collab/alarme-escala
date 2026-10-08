@@ -1,23 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Tema" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:colorPrimary">#1E6FB8</item>
-        <item name="android:colorAccent">#1E6FB8</item>
-        <item name="android:statusBarColor">#1E6FB8</item>
+        <item name="android:colorPrimary">@color/primary</item>
+        <item name="android:colorAccent">@color/primary</item>
+        <item name="android:windowBackground">@color/bg</item>
+        <item name="android:statusBarColor">@color/bg</item>
+        <item name="android:navigationBarColor">@color/bg</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:textColorPrimary">@color/ink</item>
+        <item name="android:textColorSecondary">@color/mute</item>
     </style>
 
     <style name="Tema.Tocando" parent="android:Theme.Material.NoActionBar.Fullscreen">
-        <item name="android:windowBackground">#101820</item>
-    </style>
-
-    <style name="Titulo">
-        <item name="android:layout_width">wrap_content</item>
-        <item name="android:layout_height">wrap_content</item>
-        <item name="android:layout_marginTop">24dp</item>
-        <item name="android:layout_marginBottom">6dp</item>
-        <item name="android:textSize">14sp</item>
-        <item name="android:textStyle">bold</item>
-        <item name="android:textAllCaps">true</item>
-        <item name="android:textColor">#1E6FB8</item>
+        <item name="android:windowBackground">#0B1214</item>
     </style>
 </resources>

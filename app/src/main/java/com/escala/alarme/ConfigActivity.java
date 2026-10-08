@@ -2,16 +2,18 @@ package com.escala.alarme;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.graphics.drawable.Drawable;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
-import android.util.TypedValue;
+import android.view.Gravity;
+import android.view.View;
 import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
-import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -21,7 +23,7 @@ public class ConfigActivity extends Activity {
     private static final int ESCOLHER_SOM = 2;
 
     private Escala escala;
-    private Button btnSom;
+    private TextView subSom;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -30,49 +32,92 @@ public class ConfigActivity extends Activity {
 
         LinearLayout raiz = new LinearLayout(this);
         raiz.setOrientation(LinearLayout.VERTICAL);
-        int pad = dp(20);
-        raiz.setPadding(pad, pad, pad, pad);
+        int pad = Ui.dp(this, 16);
+        raiz.setPadding(pad, pad, pad, Ui.dp(this, 32));
 
         ScrollView sv = new ScrollView(this);
         sv.setFitsSystemWindows(true);
         sv.addView(raiz);
         setContentView(sv);
 
-        TextView cabecalho = new TextView(this);
-        cabecalho.setText("Configurações");
-        cabecalho.setTextSize(TypedValue.COMPLEX_UNIT_SP, 26);
-        cabecalho.setTypeface(null, android.graphics.Typeface.BOLD);
-        raiz.addView(cabecalho);
+        LinearLayout topo = new LinearLayout(this);
+        topo.setGravity(Gravity.CENTER_VERTICAL);
+        ImageButton voltar = new ImageButton(this);
+        Drawable seta = getDrawable(R.drawable.ic_voltar).mutate();
+        seta.setTint(Ui.cor(this, R.color.ink));
+        voltar.setImageDrawable(seta);
+        voltar.setContentDescription("Voltar");
+        voltar.setBackground(Ui.ondulado(Ui.forma(this, Ui.cor(this, R.color.card),
+                Ui.cor(this, R.color.line), 14, 2)));
+        voltar.setOnClickListener(v -> finish());
+        topo.addView(voltar, new LinearLayout.LayoutParams(Ui.dp(this, 52), Ui.dp(this, 52)));
+        TextView titulo = Ui.texto(this, "Configurações", 24, true, Ui.cor(this, R.color.ink));
+        titulo.setPadding(Ui.dp(this, 14), 0, 0, 0);
+        topo.addView(titulo);
+        raiz.addView(topo, Ui.largura());
 
-        raiz.addView(titulo("Som"));
-        btnSom = new Button(this);
-        btnSom.setGravity(android.view.Gravity.START | android.view.Gravity.CENTER_VERTICAL);
-        btnSom.setOnClickListener(v -> escolherSom());
-        raiz.addView(btnSom, larguraTotal());
+        raiz.addView(rotulo("Alarme"), Ui.largura(this, 24));
+        LinearLayout som = linha("Som", "");
+        subSom = (TextView) ((LinearLayout) som.getChildAt(0)).getChildAt(1);
+        Button trocar = Ui.botao(this, "Trocar", Ui.CONTORNO);
+        trocar.setMinHeight(Ui.dp(this, 48));
+        trocar.setMinimumHeight(Ui.dp(this, 48));
+        trocar.setMinWidth(0);
+        trocar.setMinimumWidth(0);
+        trocar.setOnClickListener(v -> escolherSom());
+        som.addView(trocar);
+        raiz.addView(caixa(som), Ui.largura(this, 6));
 
-        raiz.addView(titulo("Notificação"));
-        Switch sw = new Switch(this);
-        sw.setText("Mostrar quantos dias faltam para cada alarme");
-        sw.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
-        sw.setPadding(0, dp(8), 0, dp(8));
-        sw.setChecked(escala.mostrarContagem());
-        sw.setOnCheckedChangeListener((b, v) -> {
+        raiz.addView(rotulo("Notificação"), Ui.largura(this, 24));
+        LinearLayout notif = linha("Mostrar próximos alarmes", "Fica visível também na tela de bloqueio");
+        notif.addView(Ui.interruptor(this, escala.mostrarContagem(), (b, v) -> {
             escala.setMostrarContagem(v);
             Contagem.atualizar(this);
-        });
-        raiz.addView(sw, larguraTotal());
+        }));
+        raiz.addView(caixa(notif), Ui.largura(this, 6));
 
-        raiz.addView(titulo("Teste"));
-        Button testar = new Button(this);
-        testar.setText("Testar alarme (toca em 10 segundos)");
+        raiz.addView(rotulo("Teste"), Ui.largura(this, 24));
+        Button testar = Ui.botao(this, "Testar alarme (toca em 10 segundos)", Ui.CONTORNO);
         testar.setOnClickListener(v -> {
             Agendador.agendarAvulso(this, Agendador.REQ_TESTE, 10_000L, "Teste");
             Toast.makeText(this, "Pode bloquear a tela. O alarme toca em 10 segundos.",
                     Toast.LENGTH_LONG).show();
         });
-        raiz.addView(testar, larguraTotal());
+        raiz.addView(testar, Ui.largura(this, 6));
+
+        raiz.addView(rotulo("Sobre"), Ui.largura(this, 24));
+        raiz.addView(caixa(linha("Alarme da Escala",
+                "Versão " + Atualizador.versaoInstalada(this))), Ui.largura(this, 6));
 
         atualizarSom();
+    }
+
+    private TextView rotulo(String t) {
+        return Ui.texto(this, t, 16, true, Ui.cor(this, R.color.ink));
+    }
+
+    /** Linha com título e subtítulo à esquerda; o que vier depois é adicionado à direita. */
+    private LinearLayout linha(String titulo, String sub) {
+        LinearLayout l = new LinearLayout(this);
+        l.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout textos = new LinearLayout(this);
+        textos.setOrientation(LinearLayout.VERTICAL);
+        textos.addView(Ui.texto(this, titulo, 17, true, Ui.cor(this, R.color.ink)));
+        TextView s = Ui.texto(this, sub, 14, false, Ui.cor(this, R.color.mute));
+        if (sub.isEmpty()) s.setVisibility(View.VISIBLE);
+        textos.addView(s);
+        l.addView(textos, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        return l;
+    }
+
+    private LinearLayout caixa(LinearLayout conteudo) {
+        LinearLayout c = new LinearLayout(this);
+        int p = Ui.dp(this, 14);
+        c.setPadding(p, p, p, p);
+        c.setBackground(Ui.forma(this, Ui.cor(this, R.color.card), Ui.cor(this, R.color.line), 20, 2));
+        c.addView(conteudo, Ui.largura());
+        return c;
     }
 
     private void escolherSom() {
@@ -103,36 +148,16 @@ public class ConfigActivity extends Activity {
     }
 
     private void atualizarSom() {
-        btnSom.setText("Som: " + nomeDoSom());
+        subSom.setText(nomeDoSom());
     }
 
     private String nomeDoSom() {
         String t = escala.toque();
-        if (t == null) return "padrão do celular";
+        if (t == null) return "Padrão do celular";
         try {
             Ringtone r = RingtoneManager.getRingtone(this, Uri.parse(t));
             if (r != null) return r.getTitle(this);
         } catch (Exception ignored) { }
-        return "personalizado";
-    }
-
-    private TextView titulo(String texto) {
-        TextView t = new TextView(this, null, 0, R.style.Titulo);
-        t.setText(texto);
-        LinearLayout.LayoutParams lp = larguraTotal();
-        lp.topMargin = dp(24);
-        lp.bottomMargin = dp(4);
-        t.setLayoutParams(lp);
-        return t;
-    }
-
-    private LinearLayout.LayoutParams larguraTotal() {
-        return new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT);
-    }
-
-    private int dp(int v) {
-        return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v,
-                getResources().getDisplayMetrics());
+        return "Personalizado";
     }
 }

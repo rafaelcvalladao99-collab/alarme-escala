@@ -2,32 +2,29 @@ package com.escala.alarme;
 
 import android.Manifest;
 import android.app.Activity;
-import android.app.DatePickerDialog;
 import android.app.NotificationManager;
-import android.app.TimePickerDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.Color;
-import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
-import android.media.Ringtone;
-import android.media.RingtoneManager;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.provider.Settings;
-import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Locale;
 
@@ -38,7 +35,7 @@ public class MainActivity extends Activity {
 
     private Escala escala;
     private LinearLayout avisos, lista;
-    private TextView txtVersao;
+    private TextView txtVersao, subtitulo;
     private Atualizador.Info novaVersao;
     private boolean baixando = false;
 
@@ -50,11 +47,26 @@ public class MainActivity extends Activity {
 
         avisos = findViewById(R.id.avisos);
         lista = findViewById(R.id.lista);
+        subtitulo = findViewById(R.id.subtitulo);
+        subtitulo.setTextColor(Ui.cor(this, R.color.mute));
+        ((TextView) findViewById(R.id.titulo)).setTextColor(Ui.cor(this, R.color.ink));
 
-        findViewById(R.id.btnNovo).setOnClickListener(v ->
-                startActivity(new Intent(this, EditarActivity.class)));
-        findViewById(R.id.btnConfig).setOnClickListener(v ->
-                startActivity(new Intent(this, ConfigActivity.class)));
+        ImageButton config = findViewById(R.id.btnConfig);
+        Drawable engrenagem = getDrawable(R.drawable.ic_engrenagem).mutate();
+        engrenagem.setTint(Ui.cor(this, R.color.ink));
+        config.setImageDrawable(engrenagem);
+        config.setBackground(Ui.ondulado(Ui.forma(this, Ui.cor(this, R.color.card),
+                Ui.cor(this, R.color.line), 14, 2)));
+        config.setOnClickListener(v -> startActivity(new Intent(this, ConfigActivity.class)));
+
+        Button novo = findViewById(R.id.btnNovo);
+        novo.setAllCaps(false);
+        novo.setStateListAnimator(null);
+        novo.setTextSize(18);
+        novo.setTypeface(null, android.graphics.Typeface.BOLD);
+        novo.setTextColor(Ui.cor(this, R.color.on_primary));
+        novo.setBackground(Ui.ondulado(Ui.forma(this, Ui.cor(this, R.color.primary), 0, 20, 0)));
+        novo.setOnClickListener(v -> startActivity(new Intent(this, EditarActivity.class)));
 
         if (Build.VERSION.SDK_INT >= 33
                 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -62,16 +74,14 @@ public class MainActivity extends Activity {
         }
 
         // Rodapé: versão instalada e botão de atualização.
-        LinearLayout raiz = (LinearLayout) findViewById(R.id.btnNovo).getParent();
-        txtVersao = new TextView(this);
-        txtVersao.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-        txtVersao.setAlpha(0.7f);
-        txtVersao.setPadding(0, dp(20), 0, dp(4));
-        raiz.addView(txtVersao);
-        Button btnVerificar = new Button(this);
-        btnVerificar.setText("Verificar atualização");
+        LinearLayout conteudo = findViewById(R.id.conteudo);
+        txtVersao = Ui.texto(this, "", 14, false, Ui.cor(this, R.color.mute));
+        txtVersao.setGravity(Gravity.CENTER);
+        txtVersao.setPadding(0, Ui.dp(this, 16), 0, Ui.dp(this, 4));
+        conteudo.addView(txtVersao, Ui.largura());
+        Button btnVerificar = Ui.botao(this, "Verificar atualização", Ui.CONTORNO);
         btnVerificar.setOnClickListener(v -> verificarAtualizacao(true));
-        raiz.addView(btnVerificar);
+        conteudo.addView(btnVerificar, Ui.largura());
         txtVersao.setText("Versão " + Atualizador.versaoInstalada(this));
         verificarAtualizacao(false);
     }
@@ -119,6 +129,8 @@ public class MainActivity extends Activity {
     /** Redesenha a tela e remarca o próximo alarme. */
     private void atualizar() {
         Agendador.agendar(this);
+        String data = LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, dd/MM", BR));
+        subtitulo.setText(data.substring(0, 1).toUpperCase(BR) + data.substring(1));
         montarAvisos();
         montarLista();
     }
@@ -127,71 +139,134 @@ public class MainActivity extends Activity {
         lista.removeAllViews();
         List<Alarme> todos = escala.alarmes();
         if (todos.isEmpty()) {
-            TextView vazio = new TextView(this);
-            vazio.setText("Nenhum alarme ainda. Toque em \"+ Novo alarme\" para criar o primeiro.");
-            vazio.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
-            vazio.setAlpha(0.7f);
-            lista.addView(vazio);
+            TextView vazio = Ui.texto(this,
+                    "Nenhum alarme ainda. Toque em \"+ Novo alarme\" para criar o primeiro.",
+                    16, false, Ui.cor(this, R.color.mute));
+            lista.addView(vazio, Ui.largura());
             return;
         }
         for (Alarme a : todos) lista.addView(cartao(a));
     }
 
+    // ---------- cartão de cada alarme ----------
+
     private View cartao(Alarme a) {
-        LinearLayout linha = new LinearLayout(this);
-        linha.setOrientation(LinearLayout.HORIZONTAL);
-        linha.setGravity(Gravity.CENTER_VERTICAL);
-        int p = dp(14);
-        linha.setPadding(p, p, p, p);
-        GradientDrawable fundo = new GradientDrawable();
-        fundo.setColor(Color.parseColor("#22808080"));
-        fundo.setCornerRadius(dp(12));
-        linha.setBackground(fundo);
+        boolean ciclo = a.tipo == Alarme.CICLO;
+        int corTipo = Ui.cor(this, ciclo ? R.color.ciclo : R.color.mensal);
+        int corSoft = Ui.cor(this, ciclo ? R.color.ciclo_soft : R.color.mensal_soft);
+        int ink = Ui.cor(this, R.color.ink);
+        int mute = Ui.cor(this, R.color.mute);
 
-        LinearLayout col = new LinearLayout(this);
-        col.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        int p = Ui.dp(this, 16);
+        card.setPadding(p, p, p, p);
+        card.setBackground(Ui.ondulado(Ui.forma(this, Ui.cor(this, R.color.card),
+                Ui.cor(this, R.color.line), 20, 2)));
+        card.setAlpha(a.ativo ? 1f : 0.62f);
 
-        TextView nome = new TextView(this);
-        nome.setText(a.nome);
-        nome.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
-        nome.setTypeface(null, Typeface.BOLD);
-        col.addView(nome);
-
-        TextView resumo = new TextView(this);
-        resumo.setText(a.resumo());
-        resumo.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-        resumo.setAlpha(0.7f);
-        col.addView(resumo);
-
-        LocalDateTime prox = a.proximo(LocalDateTime.now());
-        TextView proximo = new TextView(this);
-        if (!a.ativo) proximo.setText("Desligado");
-        else if (prox == null) proximo.setText("Sem próximo alarme");
-        else proximo.setText("Próximo: " + Contagem.quando(prox));
-        proximo.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-        proximo.setPadding(0, dp(4), 0, 0);
-        col.addView(proximo);
-
-        linha.addView(col, new LinearLayout.LayoutParams(0,
-                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-
-        Switch sw = new Switch(this);
-        sw.setChecked(a.ativo);
-        sw.setOnCheckedChangeListener((b, v) -> {
+        // linha de cima: tipo + interruptor
+        LinearLayout topo = new LinearLayout(this);
+        topo.setGravity(Gravity.CENTER_VERTICAL);
+        TextView tag = Ui.texto(this, ciclo ? "Escala de trabalho" : "Todo mês", 13, true, corTipo);
+        Drawable icone = getDrawable(ciclo ? R.drawable.ic_ciclo : R.drawable.ic_calendario).mutate();
+        icone.setTint(corTipo);
+        int d16 = Ui.dp(this, 16);
+        icone.setBounds(0, 0, d16, d16);
+        tag.setCompoundDrawables(icone, null, null, null);
+        tag.setCompoundDrawablePadding(Ui.dp(this, 6));
+        tag.setBackground(Ui.forma(this, corSoft, 0, 999, 0));
+        tag.setPadding(Ui.dp(this, 10), Ui.dp(this, 4), Ui.dp(this, 12), Ui.dp(this, 4));
+        topo.addView(tag);
+        View espaco = new View(this);
+        topo.addView(espaco, new LinearLayout.LayoutParams(0, 1, 1f));
+        Switch sw = Ui.interruptor(this, a.ativo, (b, v) -> {
             a.ativo = v;
             escala.salvarUm(a);
             atualizar();
         });
-        linha.addView(sw);
+        topo.addView(sw);
+        card.addView(topo, Ui.largura());
 
-        linha.setOnClickListener(v -> startActivity(
+        card.addView(Ui.texto(this, a.nome, 18, true, ink), Ui.largura(this, 8));
+
+        LocalDateTime prox = a.proximo(LocalDateTime.now());
+        TextView hora = Ui.texto(this, prox != null ? Alarme.hhmm(prox.getHour() * 60 + prox.getMinute()) : "—:—",
+                44, true, ink);
+        hora.setFontFeatureSettings("tnum");
+        card.addView(hora, Ui.largura(this, 4));
+
+        LinearLayout quando = new LinearLayout(this);
+        quando.setGravity(Gravity.CENTER_VERTICAL);
+        if (!a.ativo) {
+            quando.addView(Ui.texto(this, "Desligado", 15, false, mute));
+        } else if (prox == null) {
+            quando.addView(Ui.texto(this, "Sem próximo alarme", 15, false, mute));
+        } else {
+            long dias = ChronoUnit.DAYS.between(LocalDate.now(), prox.toLocalDate());
+            String rotulo = dias <= 0 ? "hoje" : dias == 1 ? "amanhã" : "em " + dias + " dias";
+            TextView chip = Ui.texto(this, rotulo, 13, true, Ui.cor(this, R.color.bg));
+            chip.setBackground(Ui.forma(this, ink, 0, 8, 0));
+            chip.setPadding(Ui.dp(this, 8), Ui.dp(this, 2), Ui.dp(this, 8), Ui.dp(this, 2));
+            quando.addView(chip);
+            String data = prox.format(DateTimeFormatter.ofPattern("EEE, dd/MM", BR));
+            if (!ciclo) data += " · todo dia " + a.diaMes;
+            TextView dt = Ui.texto(this, data, 15, false, mute);
+            dt.setPadding(Ui.dp(this, 8), 0, 0, 0);
+            quando.addView(dt);
+        }
+        card.addView(quando, Ui.largura());
+
+        if (ciclo) card.addView(faixa(a), Ui.largura(this, 12));
+
+        card.setOnClickListener(v -> startActivity(
                 new Intent(this, EditarActivity.class).putExtra("id", a.id)));
 
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.bottomMargin = dp(10);
-        linha.setLayoutParams(lp);
-        return linha;
+        LinearLayout.LayoutParams lp = Ui.largura();
+        lp.bottomMargin = Ui.dp(this, 12);
+        card.setLayoutParams(lp);
+        return card;
+    }
+
+    /** Faixa com um quadradinho por dia do ciclo: cheio = trabalho, contorno forte = hoje. */
+    private View faixa(Alarme a) {
+        int hoje = a.posicao(LocalDate.now());
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+
+        if (a.ciclo <= 14) {
+            LinearLayout fila = new LinearLayout(this);
+            for (int i = 0; i < a.ciclo; i++) {
+                boolean trab = i < a.trabalho;
+                TextView t = Ui.texto(this, String.valueOf(i + 1), 12, true,
+                        Ui.cor(this, trab ? R.color.on_primary : R.color.mute));
+                t.setGravity(Gravity.CENTER);
+                int fundo = trab ? Ui.cor(this, R.color.ciclo) : 0;
+                int borda = i == hoje ? Ui.cor(this, R.color.ink)
+                        : Ui.cor(this, trab ? R.color.ciclo : R.color.line);
+                t.setBackground(Ui.forma(this, fundo, borda, 8, i == hoje ? 3 : 2));
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, Ui.dp(this, 30), 1f);
+                lp.setMargins(Ui.dp(this, 2), 0, Ui.dp(this, 2), 0);
+                fila.addView(t, lp);
+            }
+            col.addView(fila, Ui.largura());
+        }
+
+        String esquerda = "Dia " + (hoje + 1) + " de " + a.ciclo;
+        String direita;
+        if (hoje < a.trabalho) {
+            int resta = a.trabalho - 1 - hoje;
+            direita = resta == 0 ? "Último dia de trabalho" : "Trabalha mais " + resta + (resta == 1 ? " dia" : " dias");
+        } else {
+            int volta = a.ciclo - hoje;
+            direita = "Folga: volta em " + volta + (volta == 1 ? " dia" : " dias");
+        }
+        LinearLayout legenda = new LinearLayout(this);
+        legenda.addView(Ui.texto(this, esquerda, 13, false, Ui.cor(this, R.color.mute)),
+                new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        legenda.addView(Ui.texto(this, direita, 13, false, Ui.cor(this, R.color.mute)));
+        col.addView(legenda, Ui.largura(this, 6));
+        return col;
     }
 
     @Override
@@ -200,7 +275,7 @@ public class MainActivity extends Activity {
         atualizar();
     }
 
-    // ---------- avisos de permissão ----------
+    // ---------- avisos ----------
 
     private void montarAvisos() {
         avisos.removeAllViews();
@@ -208,7 +283,7 @@ public class MainActivity extends Activity {
 
         if (novaVersao != null) {
             aviso("Tem uma versão nova do app (" + novaVersao.versao + ").",
-                    "Atualizar agora", this::iniciarAtualizacao);
+                    "Atualizar agora", this::iniciarAtualizacao, true);
         }
 
         if (Build.VERSION.SDK_INT >= 33
@@ -221,13 +296,13 @@ public class MainActivity extends Activity {
                             abrir(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
                                     .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName()));
                         }
-                    });
+                    }, false);
         }
 
         if (!Agendador.podeAgendar(this) && Build.VERSION.SDK_INT >= 31) {
             aviso("O app precisa de permissão para \"Alarmes e lembretes\". Sem ela o alarme NÃO toca.",
                     "Dar permissão", () -> abrir(new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
-                            Uri.parse(pkg))));
+                            Uri.parse(pkg))), false);
         }
 
         if (Build.VERSION.SDK_INT >= 34) {
@@ -235,7 +310,7 @@ public class MainActivity extends Activity {
             if (!nm.canUseFullScreenIntent()) {
                 aviso("Permita \"notificações em tela cheia\" para o alarme aparecer com o celular bloqueado.",
                         "Permitir tela cheia", () -> abrir(new Intent(
-                                Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse(pkg))));
+                                Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse(pkg))), false);
             }
         }
 
@@ -243,33 +318,26 @@ public class MainActivity extends Activity {
         if (!pm.isIgnoringBatteryOptimizations(getPackageName())) {
             aviso("Recomendado: tirar o app da economia de bateria, para o celular não bloquear o alarme.",
                     "Liberar bateria", () -> abrir(new Intent(
-                            Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse(pkg))));
+                            Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse(pkg))), false);
         }
     }
 
-    private void aviso(String texto, String botao, Runnable acao) {
+    private void aviso(String texto, String botao, Runnable acao, boolean novidade) {
         LinearLayout caixa = new LinearLayout(this);
         caixa.setOrientation(LinearLayout.VERTICAL);
-        int p = dp(12);
+        int p = Ui.dp(this, 14);
         caixa.setPadding(p, p, p, p);
-        GradientDrawable fundo = new GradientDrawable();
-        fundo.setColor(Color.parseColor("#33FF9800"));
-        fundo.setCornerRadius(dp(12));
-        caixa.setBackground(fundo);
+        caixa.setBackground(Ui.forma(this,
+                Ui.cor(this, novidade ? R.color.ciclo_soft : R.color.mensal_soft), 0, 16, 0));
 
-        TextView t = new TextView(this);
-        t.setText(texto);
-        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
-        caixa.addView(t);
+        caixa.addView(Ui.texto(this, texto, 15, false, Ui.cor(this, R.color.ink)), Ui.largura());
 
-        Button b = new Button(this);
-        b.setText(botao);
+        Button b = Ui.botao(this, botao, novidade ? Ui.PRIMARIO : Ui.CONTORNO);
         b.setOnClickListener(v -> acao.run());
-        caixa.addView(b);
+        caixa.addView(b, Ui.largura(this, 10));
 
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.bottomMargin = dp(10);
+        LinearLayout.LayoutParams lp = Ui.largura();
+        lp.bottomMargin = Ui.dp(this, 10);
         avisos.addView(caixa, lp);
     }
 
@@ -282,10 +350,5 @@ public class MainActivity extends Activity {
                         Uri.parse("package:" + getPackageName())));
             } catch (Exception ignored) { }
         }
-    }
-
-    private int dp(int v) {
-        return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v,
-                getResources().getDisplayMetrics());
     }
 }

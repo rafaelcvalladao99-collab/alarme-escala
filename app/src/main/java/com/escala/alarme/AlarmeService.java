@@ -119,10 +119,10 @@ public class AlarmeService extends Service {
         try {
             int max = am.getStreamMaxVolume(AudioManager.STREAM_ALARM);
             int atual = am.getStreamVolume(AudioManager.STREAM_ALARM);
-            int minimo = (int) Math.ceil(max * 0.7);
-            if (atual < minimo) {
+            int alvo = Math.max(1, (int) Math.round(max * new Escala(this).volume() / 100.0));
+            if (atual != alvo) {
                 volumeOriginal = atual;
-                am.setStreamVolume(AudioManager.STREAM_ALARM, minimo, 0);
+                am.setStreamVolume(AudioManager.STREAM_ALARM, alvo, 0);
             }
         } catch (Exception ignored) { }
 

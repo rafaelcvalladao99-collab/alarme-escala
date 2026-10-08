@@ -126,6 +126,10 @@ public class Escala {
     public String toque() { return p.getString("toque", null); }
     public void setToque(String uri) { p.edit().putString("toque", uri).apply(); }
 
+    /** Volume do alarme em porcentagem do volume máximo (10 a 100). */
+    public int volume() { return Math.max(10, Math.min(100, p.getInt("volume", 70))); }
+    public void setVolume(int v) { p.edit().putInt("volume", Math.max(10, Math.min(100, v))).apply(); }
+
     public int sonecaMinutos() { return p.getInt("soneca", 10); }
 
     public boolean mostrarContagem() { return p.getBoolean("contagem", true); }

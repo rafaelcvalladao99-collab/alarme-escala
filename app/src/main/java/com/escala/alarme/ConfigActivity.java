@@ -2,6 +2,7 @@ package com.escala.alarme;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.res.ColorStateList;
 import android.graphics.drawable.Drawable;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
@@ -14,6 +15,7 @@ import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -67,6 +69,37 @@ public class ConfigActivity extends Activity {
         trocar.setOnClickListener(v -> escolherSom());
         som.addView(trocar);
         raiz.addView(caixa(som), Ui.largura(this, 6));
+
+        // volume do alarme
+        LinearLayout vol = new LinearLayout(this);
+        vol.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout volTopo = linha("Volume", "Vale só quando o alarme toca");
+        TextView pct = Ui.texto(this, escala.volume() + "%", 20, true, Ui.cor(this, R.color.ink));
+        volTopo.addView(pct);
+        vol.addView(volTopo, Ui.largura());
+        SeekBar barra = new SeekBar(this);
+        barra.setMax(90);
+        barra.setProgress(escala.volume() - 10);
+        ColorStateList cp = ColorStateList.valueOf(Ui.cor(this, R.color.primary));
+        barra.setProgressTintList(cp);
+        barra.setThumbTintList(cp);
+        barra.setProgressBackgroundTintList(ColorStateList.valueOf(Ui.cor(this, R.color.line)));
+        barra.setMinimumHeight(Ui.dp(this, 48));
+        barra.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar s, int progresso, boolean doUsuario) {
+                pct.setText((progresso + 10) + "%");
+                if (doUsuario) escala.setVolume(progresso + 10);
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar s) { }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar s) { }
+        });
+        vol.addView(barra, Ui.largura(this, 6));
+        raiz.addView(caixa(vol), Ui.largura(this, 10));
 
         raiz.addView(rotulo("Notificação"), Ui.largura(this, 24));
         LinearLayout notif = linha("Mostrar próximos alarmes", "Fica visível também na tela de bloqueio");

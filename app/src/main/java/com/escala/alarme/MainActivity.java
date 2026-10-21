@@ -231,7 +231,7 @@ public class MainActivity extends Activity {
         return card;
     }
 
-    /** Faixa com um quadradinho por dia do ciclo: cheio = trabalho, contorno forte = hoje. */
+    /** Faixa com um quadradinho por dia do ciclo atual (número = dia do mês): cheio = trabalho, contorno forte = hoje. */
     private View faixa(Alarme a) {
         int hoje = a.posicao(LocalDate.now());
         LinearLayout col = new LinearLayout(this);
@@ -244,7 +244,7 @@ public class MainActivity extends Activity {
                 LocalDate dia = inicioCiclo.plusDays(i);
                 int turno = a.turnoEm(dia);
                 int sem = dia.getDayOfWeek().getValue();
-                View cel = Ui.celula(this, String.valueOf(i + 1), Ui.SEMANA[sem - 1], turno != Alarme.NADA,
+                View cel = Ui.celula(this, String.valueOf(dia.getDayOfMonth()), Ui.SEMANA[sem - 1], turno != Alarme.NADA,
                         i == hoje, sem >= 6, false, Ui.nomeTurno(turno), 30);
                 LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0,
                         LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
